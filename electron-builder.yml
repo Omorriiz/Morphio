@@ -1,0 +1,24 @@
+appId: app.morphio.desktop
+productName: Morphio
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**/*
+  - package.json
+  # ONNX Runtime: оставляем только Windows x64 (без Linux/macOS бинарников)
+  - '!node_modules/onnxruntime-node/bin/napi-v6/linux/**'
+  - '!node_modules/onnxruntime-node/bin/napi-v6/darwin/**'
+  - '!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**'
+asarUnpack:
+  - node_modules/sharp/**/*
+  - node_modules/@img/**/*
+  - node_modules/onnxruntime-node/**/*
+  # FFmpeg нужно запускать как обычную программу, поэтому он лежит вне архива
+  - node_modules/ffmpeg-static/**/*
+win:
+  icon: build/icon.ico
+  target:
+    - target: portable
+      arch: [x64]
+  artifactName: Morphio.${ext}
