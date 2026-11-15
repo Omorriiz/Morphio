@@ -4,6 +4,7 @@ import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import ffmpegStatic from 'ffmpeg-static'
+import { tm } from './tm'
 import type {
   GifProgress,
   GpuKind,
@@ -19,7 +20,7 @@ const FRAMES_ROOT = join(tmpdir(), 'morphio-frames')
 
 /** FFmpeg нельзя запускать изнутри asar-архива: в собранном приложении он лежит рядом, в .unpacked. */
 export function ffmpegBinary(): string {
-  if (!ffmpegStatic) throw new Error('FFmpeg не найден в приложении')
+  if (!ffmpegStatic) throw new Error(tm('FFmpeg не найден в приложении'))
   return ffmpegStatic.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
 }
 
@@ -64,7 +65,7 @@ export function run(args: string[], onStdoutLine?: (line: string) => void): Prom
     })
     child.on('close', (code) => {
       running.delete(child)
-      if (stopped.has(child)) return reject(new Error('Остановлено'))
+      if (stopped.has(child)) return reject(new Error(tm('Остановлено')))
       resolve({ code, stdout: Buffer.concat(out), stderr: Buffer.concat(err).toString('utf8') })
     })
   })
@@ -76,7 +77,7 @@ export async function videoInfo(path: string): Promise<VideoInfo> {
 
   const dur = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(stderr)
   const size = /Video:[^\n]*?,\s*(\d{2,5})x(\d{2,5})/.exec(stderr)
-  if (!size) throw new Error('Не удалось прочитать видео. Возможно, файл повреждён или это не видео')
+  if (!size) throw new Error(tm('Не удалось прочитать видео. Возможно, файл повреждён или это не видео'))
 
   let width = Number(size[1])
   let height = Number(size[2])
@@ -118,7 +119,7 @@ export async function videoPoster(path: string, time: number, maxSide: number): 
     '4',
     'pipe:1'
   ])
-  if (stdout.length === 0) throw new Error(`Не удалось получить кадр (код ${code})`)
+  if (stdout.length === 0) throw new Error(tm('Не удалось получить кадр (код {code})', { code: code ?? -1 }))
   return `data:image/jpeg;base64,${stdout.toString('base64')}`
 }
 
@@ -129,7 +130,7 @@ export async function extractVideoFrames(
 ): Promise<VideoExtractResult> {
   const fps = Math.min(60, Math.max(1, options.fps))
   const duration = Math.min(options.duration, MAX_FRAMES / fps)
-  if (duration <= 0) throw new Error('Длина отрезка должна быть больше нуля')
+  if (duration <= 0) throw new Error(tm('Длина отрезка должна быть больше нуля'))
 
   const dir = join(FRAMES_ROOT, randomUUID())
   await fs.mkdir(dir, { recursive: true })
@@ -162,17 +163,17 @@ export async function extractVideoFrames(
     ],
     (line) => {
       const m = /^frame=(\d+)/.exec(line)
-      if (m) report({ text: 'Вынимаю кадры из видео…', done: Math.min(Number(m[1]), expected), total: expected })
+      if (m) report({ text: tm('Вынимаю кадры из видео…'), done: Math.min(Number(m[1]), expected), total: expected })
     }
   )
-  if (code !== 0) throw new Error(`FFmpeg завершился с ошибкой: ${stderr.trim().split('\n').pop() ?? code}`)
+  if (code !== 0) throw new Error(tm('FFmpeg завершился с ошибкой: {msg}', { msg: stderr.trim().split('\n').pop() ?? code ?? -1 }))
 
   const files = (await fs.readdir(dir)).filter((f) => f.endsWith('.png')).sort()
-  if (files.length === 0) throw new Error('В выбранном отрезке нет кадров')
+  if (files.length === 0) throw new Error(tm('В выбранном отрезке нет кадров'))
 
   const frames = await inspectFrames(
     files.map((f) => join(dir, f)),
-    (done, total) => report({ text: 'Готовлю превью кадров…', done, total })
+    (done, total) => report({ text: tm('Готовлю превью кадров…'), done, total })
   )
   return { frames, delay: Math.round(1000 / fps) }
 }

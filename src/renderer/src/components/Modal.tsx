@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useI18n } from '../i18n'
 
 interface Props {
   title: string
@@ -10,6 +11,7 @@ interface Props {
 
 /** Окно поверх интерфейса. Закрывается по Esc и клику на затемнённый фон. */
 export default function Modal({ title, onClose, children, footer, wide }: Props): React.JSX.Element {
+  const { t } = useI18n()
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
@@ -23,7 +25,7 @@ export default function Modal({ title, onClose, children, footer, wide }: Props)
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title}>
         <header className="modal-head">
           <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} title="Закрыть">
+          <button className="icon-btn" onClick={onClose} title={t('Закрыть')}>
             <svg viewBox="0 0 24 24" aria-hidden>
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>

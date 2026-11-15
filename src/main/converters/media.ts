@@ -6,12 +6,10 @@ import type { FileItem, GpuKind, MediaOptions, VideoTarget } from '@shared/types
 import { freePath } from '../files'
 import { probeMedia, run, videoPoster } from '../ffmpeg'
 import type { JobResult } from '../queue'
+import { tm } from '../tm'
 
-const GPU_LABEL: Record<GpuKind, string> = {
-  nvenc: 'видеокарта NVIDIA',
-  amf: 'видеокарта AMD',
-  qsv: 'графика Intel'
-}
+const gpuLabel = (k: GpuKind): string =>
+  ({ nvenc: tm('видеокарта NVIDIA'), amf: tm('видеокарта AMD'), qsv: tm('графика Intel') })[k]
 
 /** Читает файлы: длительность, размер кадра, наличие звука и кадр-превью для видео. */
 export async function inspectMedia(paths: string[]): Promise<FileItem[]> {
@@ -132,8 +130,8 @@ export async function convertMedia(
   const target = options.target
   const audioOnly = AUDIO_TARGETS.some((a) => a.id === target)
 
-  if (!audioOnly && item.kind === 'audio') throw new Error('Из звукового файла нельзя сделать видео')
-  if (audioOnly && item.hasAudio === false) throw new Error('В этом видео нет звука')
+  if (!audioOnly && item.kind === 'audio') throw new Error(tm('Из звукового файла нельзя сделать видео'))
+  if (audioOnly && item.hasAudio === false) throw new Error(tm('В этом видео нет звука'))
 
   const dir = options.outputDir ?? dirname(item.path)
   await fs.mkdir(dir, { recursive: true })
@@ -164,8 +162,8 @@ export async function convertMedia(
       if (m && duration > 0) onPercent(Math.min(99, (Number(m[1]) / 1e6 / duration) * 100))
     })
     if (code !== 0) {
-      const last = stderr.trim().split('\n').filter(Boolean).pop() ?? `код ${code}`
-      throw new Error(`Не удалось конвертировать: ${last}`)
+      const last = stderr.trim().split('\n').filter(Boolean).pop() ?? tm('код {code}', { code: code ?? -1 })
+      throw new Error(tm('Не удалось конвертировать: {msg}', { msg: last }))
     }
   }
 
@@ -175,7 +173,7 @@ export async function convertMedia(
     if (audioOnly) {
       const lossy = AUDIO_TARGETS.find((a) => a.id === target)?.lossy
       await encode([...audioCodecArgs(target, options.audioBitrate)], [])
-      note = lossy ? `${target.toUpperCase()} ${options.audioBitrate} кбит/с` : target.toUpperCase()
+      note = lossy ? tm('{fmt} {kbps} кбит/с', { fmt: target.toUpperCase(), kbps: options.audioBitrate }) : target.toUpperCase()
     } else {
       // «720p» — это короткая сторона кадра: у вертикального видео ограничиваем ширину.
       const portrait = !!item.width && !!item.height && item.width < item.height
@@ -183,7 +181,7 @@ export async function convertMedia(
         h ? [portrait ? `scale='min(${h},iw)':-2` : `scale=-2:'min(${h},ih)'`] : []
       const audioArgs = options.mute ? [] : audioCodecArgs(target === 'webm' ? 'webm' : 'm4a', options.audioBitrate)
       const label = target === 'webm' ? 'VP9' : 'H.264'
-      const hw = gpu ? ` · ${GPU_LABEL[gpu]}` : ''
+      const hw = gpu ? ` · ${gpuLabel(gpu)}` : ''
 
       if (options.targetMB && duration > 0) {
         // Целимся в размер: считаем битрейт видео из лимита и длительности, при промахе повторяем.
@@ -205,7 +203,7 @@ export async function convertMedia(
           if (size <= targetBytes || attempts >= 3 || vk <= 40) break
           vk = Math.max(40, Math.floor(vk * ((targetBytes * 0.94) / size)))
         }
-        note = `${label}${hw} · под ${options.targetMB} МБ${height ? `, ${height}p` : ''}`
+        note = `${label}${hw} · ${tm('под {mb} МБ', { mb: options.targetMB })}${height ? `, ${height}p` : ''}`
       } else {
         await encode(
           [...videoCodecArgs(target as VideoTarget, options.quality, gpu), ...audioArgs],

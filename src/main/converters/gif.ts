@@ -6,6 +6,7 @@ import { orderFrames } from '@shared/types'
 import type { GifBuildOptions, GifFrame, GifProgress, GifResult } from '@shared/types'
 import { openImage } from '../imageInput'
 import { freePath } from '../files'
+import { tm } from '../tm'
 
 export const MAX_FRAMES = 400
 /** Если все кадры анимации в сыром виде весят больше — читаем их по одному. */
@@ -122,7 +123,7 @@ function planAttempts(options: GifBuildOptions): Attempt[] {
     scale: 1,
     colours: options.colours,
     quality: options.quality,
-    label: 'без изменений'
+    label: tm('без изменений')
   }
   if (!options.targetKB) return [base]
 
@@ -140,7 +141,7 @@ function planAttempts(options: GifBuildOptions): Attempt[] {
       [0.25, Math.min(c, 32)]
     ]
     for (const [scale, colours] of steps) {
-      list.push({ scale, colours, quality: options.quality, label: `${Math.round(scale * 100)}% размера, ${colours} цветов` })
+      list.push({ scale, colours, quality: options.quality, label: tm('{pct}% размера, {colours} цветов', { pct: Math.round(scale * 100), colours }) })
     }
   } else {
     const steps: [number, number][] = [
@@ -152,7 +153,7 @@ function planAttempts(options: GifBuildOptions): Attempt[] {
       [0.35, 30]
     ]
     for (const [scale, quality] of steps) {
-      list.push({ scale, colours: options.colours, quality, label: `${Math.round(scale * 100)}% размера, качество ${quality}` })
+      list.push({ scale, colours: options.colours, quality, label: tm('{pct}% размера, качество {quality}', { pct: Math.round(scale * 100), quality }) })
     }
   }
   return list
@@ -164,7 +165,7 @@ export async function buildGif(
   options: GifBuildOptions,
   report: Report
 ): Promise<GifResult> {
-  if (frames.length === 0) throw new Error('Добавьте хотя бы один кадр')
+  if (frames.length === 0) throw new Error(tm('Добавьте хотя бы один кадр'))
   const ordered = orderFrames(frames, options.order)
 
   // Размер холста: по первому кадру списка (не зависит от выбранного порядка проигрывания).
@@ -181,7 +182,7 @@ export async function buildGif(
   const unique = [...new Map(ordered.map((f) => [f.id, f])).values()]
   let done = 0
   for (const f of unique) {
-    report({ text: 'Подготавливаю кадры…', done, total: unique.length })
+    report({ text: tm('Подготавливаю кадры…'), done, total: unique.length })
     const buf = await (await loadFrame(f))
       .resize(baseW, baseH, { fit: options.fit, background: bg })
       .ensureAlpha()
@@ -205,7 +206,7 @@ export async function buildGif(
   for (let i = 0; i < attempts.length; i++) {
     const a = attempts[i]
     report({
-      text: options.targetKB ? `Подбираю размер (попытка ${i + 1} из ${attempts.length})…` : 'Собираю анимацию…',
+      text: options.targetKB ? tm('Подбираю размер (попытка {i} из {n})…', { i: i + 1, n: attempts.length }) : tm('Собираю анимацию…'),
       done: i,
       total: attempts.length
     })
@@ -275,7 +276,7 @@ export async function buildGif(
     width: result.w,
     height: result.h,
     frames: ordered.length,
-    note: degraded ? `Чтобы уложиться в размер: ${result.attempt.label}` : undefined,
+    note: degraded ? tm('Чтобы уложиться в размер: {label}', { label: result.attempt.label }) : undefined,
     reachedTarget: options.targetKB ? reached : undefined,
     previewUrl:
       result.data.length <= 12 * 1024 * 1024
@@ -291,7 +292,7 @@ export async function exportFrames(
   report: Report
 ): Promise<{ dir: string; count: number }> {
   const first = frames[0]
-  if (!first) throw new Error('Нет кадров')
+  if (!first) throw new Error(tm('Нет кадров'))
   const base = basename(first.path, extname(first.path)).replace(/[\\/:*?"<>|]/g, '_')
   let dir = join(outputDir, `${base}-frames`)
   let n = 1
@@ -306,7 +307,7 @@ export async function exportFrames(
   await fs.mkdir(dir, { recursive: true })
   const pad = String(frames.length).length < 3 ? 3 : String(frames.length).length
   for (let i = 0; i < frames.length; i++) {
-    report({ text: 'Сохраняю кадры…', done: i, total: frames.length })
+    report({ text: tm('Сохраняю кадры…'), done: i, total: frames.length })
     await (await loadFrame(frames[i]))
       .png()
       .toFile(join(dir, `${base}-${String(i + 1).padStart(pad, '0')}.png`))

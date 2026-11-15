@@ -14,6 +14,8 @@ import { useFileJobs } from '../hooks/useFileJobs'
 import FileList from '../components/FileList'
 import DropOverlay from '../components/DropOverlay'
 import { formatBytes } from '../lib'
+import { useI18n } from '../i18n'
+import { Field, Section, Segmented, Switch } from '../components/ui'
 
 const SWATCHES = ['#ffffff', '#000000', '#f4f1ea', '#22cc88', '#4f8cff', '#ff6b8a', '#ffc933']
 
@@ -42,6 +44,7 @@ const FORMATS: { id: BgOutputFormat; label: string; hint: string }[] = [
 ]
 
 export default function BackgroundView({ active }: { active: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   const job = useFileJobs(active)
   const { files, progress, running, stats, allDone } = job
 
@@ -127,23 +130,23 @@ export default function BackgroundView({ active }: { active: boolean }): React.J
     <div className="banner">
       <div className="banner-icon">🧠</div>
       <div className="banner-text">
-        <strong>Нужна нейросеть для удаления фона</strong>
+        <strong>{t('Нужна нейросеть для удаления фона')}</strong>
         <span className="muted">
-          Скачивается один раз ({model.sizeMB} МБ) и дальше работает полностью офлайн.
+          {t('Скачивается один раз ({mb} МБ) и дальше работает полностью офлайн.', { mb: model.sizeMB })}
         </span>
         {downloading && (
-          <div className="progress" aria-label="Загрузка">
+          <div className="progress" aria-label={t('Загрузка')}>
             <div className="progress-bar" style={{ width: `${pct}%` }} />
           </div>
         )}
-        {download?.error && <span className="error small">Не удалось скачать: {download.error}</span>}
+        {download?.error && <span className="error small">{t('Не удалось скачать:')} {download.error}</span>}
       </div>
       <button className="btn primary" onClick={startDownload} disabled={downloading}>
         {downloading
           ? `${pct}% · ${formatBytes(download?.received ?? 0)}`
           : download?.error
-            ? 'Повторить'
-            : 'Скачать'}
+            ? t('Повторить')
+            : t('Скачать')}
       </button>
     </div>
   )
@@ -181,252 +184,214 @@ export default function BackgroundView({ active }: { active: boolean }): React.J
       {files.length === 0 ? (
         <div className="empty-state">
           <div className="hero-emoji">✨</div>
-          <h1>Уберём фон одним кликом</h1>
-          <p>Перетащите фото людей, товаров или животных — нейросеть вырежет объект сама</p>
+          <h1>{t('Уберём фон одним кликом')}</h1>
+          <p>{t('Перетащите фото людей, товаров или животных — нейросеть вырежет объект сама')}</p>
           <button className="btn primary big" onClick={job.pick}>
-            Выбрать фото
+            {t('Выбрать фото')}
           </button>
-          <span className="hint">Работает на вашем компьютере, ничего не отправляется в интернет</span>
+          <span className="hint">{t('Работает на вашем компьютере, ничего не отправляется в интернет')}</span>
           {modelCard && <div className="banner-wrap">{modelCard}</div>}
         </div>
       ) : (
         <>
           <header className="list-head">
             <div>
-              <h2>Ваши фото</h2>
-              <span className="muted">{files.length} шт.</span>
+              <h2>{t('Ваши фото')}</h2>
+              <span className="muted">{t('{n} шт.', { n: files.length })}</span>
             </div>
             <div className="row">
               <button className="btn ghost" onClick={job.pick} disabled={running}>
-                + Добавить
+                {t('+ Добавить')}
               </button>
               <button className="btn ghost" onClick={job.clear} disabled={running}>
-                Очистить
+                {t('Очистить')}
               </button>
             </div>
           </header>
 
-          {modelCard && <div className="banner-wrap tight">{modelCard}</div>}
+          <div className="cv-scroll">
+            {modelCard && <div className="banner-wrap tight">{modelCard}</div>}
 
-          <FileList
-            files={files}
-            progress={progress}
-            running={running}
-            onRemove={job.remove}
-            previewResult
-            onEdit={(file, result) => setEditing({ file, result })}
-          />
+            <FileList
+              files={files}
+              progress={progress}
+              running={running}
+              onRemove={job.remove}
+              previewResult
+              compact={files.length > 3}
+              flow
+              onEdit={(file, result) => setEditing({ file, result })}
+            />
 
-          <section className="settings">
-            <div className="setting">
-              <label>Что за фон на картинке</label>
-              <div className="chips">
-                {METHODS.map((m) => (
-                  <button
-                    key={m.id}
-                    className={`chip ${method === m.id ? 'active' : ''}`}
-                    onClick={() => setMethod(m.id)}
-                    title={m.hint}
-                    disabled={running}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <span className="muted small">{METHODS.find((m) => m.id === method)!.hint}</span>
-            </div>
+            <Section title={t('Что за фон на картинке')}>
+              <Segmented
+                value={method}
+                disabled={running}
+                onChange={setMethod}
+                options={METHODS.map((m) => ({ id: m.id, label: t(m.label), hint: t(m.hint) }))}
+              />
+              <span className="field-hint">{t(METHODS.find((m) => m.id === method)!.hint)}</span>
 
-            {showSolidOptions && (
-              <div className="setting-row">
-                <div className="setting grow">
-                  <label>
-                    Допуск по цвету
-                    <b>{tolerance === 0 ? 'авто' : tolerance}</b>
-                  </label>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={tolerance}
-                    disabled={running}
-                    onChange={(e) => setTolerance(Number(e.target.value))}
-                  />
-                </div>
-                <div className="setting">
-                  <label>Цвет фона</label>
-                  <div className="row tight">
-                    <button
-                      className="btn soft eyedropper"
-                      onClick={() => setPicking(true)}
-                      disabled={running}
-                      title="Выбрать цвет фона прямо на картинке"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden>
-                        <path d="M14 6l4 4M5 19l1-4 8-8 3 3-8 8zM16 4l4 4" />
-                      </svg>
-                      {bgColor ? (
-                        <>
-                          <i className="dot" style={{ background: bgColor }} /> {bgColor}
-                        </>
-                      ) : (
-                        'Пипетка (сейчас авто)'
-                      )}
-                    </button>
-                    {bgColor && (
-                      <button
-                        className="icon-btn"
-                        title="Вернуть автоопределение"
-                        onClick={() => setBgColor(undefined)}
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden>
-                          <path d="M6 6l12 12M18 6L6 18" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showSolidOptions && (
-              <div className="setting-row checks">
-                <label
-                  className="check"
-                  title="Убирает фон в щелях и отверстиях внутри предметов. Выключите, если на предмете есть свечение такого же цвета, как фон"
-                >
-                  <input
-                    type="checkbox"
-                    checked={everywhere}
-                    disabled={running}
-                    onChange={(e) => setEverywhere(e.target.checked)}
-                  />
-                  <span>Убирать фон и внутри предметов</span>
-                </label>
-                <label
-                  className="check"
-                  title="Паутина, дымка и свечение остаются полупрозрачными, без розовой пелены"
-                >
-                  <input
-                    type="checkbox"
-                    checked={translucent}
-                    disabled={running}
-                    onChange={(e) => setTranslucent(e.target.checked)}
-                  />
-                  <span>Сохранять полупрозрачность (паутина, дымка)</span>
-                </label>
-              </div>
-            )}
-
-            <div className="setting-row">
-              <div className="setting">
-                <label>Результат</label>
-                <div className="chips">
-                  <button
-                    className={`chip ${mode === 'transparent' ? 'active' : ''}`}
-                    onClick={() => setMode('transparent')}
-                    disabled={running}
-                  >
-                    Прозрачный
-                  </button>
-                  <button
-                    className={`chip ${mode === 'color' ? 'active' : ''}`}
-                    onClick={() => setMode('color')}
-                    disabled={running}
-                  >
-                    Цвет
-                  </button>
-                </div>
-              </div>
-
-              {mode === 'color' && (
-                <div className="setting">
-                  <label>Цвет</label>
-                  <div className="swatches">
-                    {SWATCHES.map((c) => (
-                      <button
-                        key={c}
-                        className={`swatch ${color === c ? 'active' : ''}`}
-                        style={{ background: c }}
-                        onClick={() => setColor(c)}
-                        disabled={running}
-                        aria-label={c}
-                      />
-                    ))}
-                    <label className="swatch custom" title="Свой цвет">
+              {showSolidOptions && (
+                <>
+                  <div className="options">
+                    <Field label={t('Допуск по цвету')} hint={tolerance === 0 ? t('авто') : String(tolerance)}>
                       <input
-                        type="color"
-                        value={color}
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={tolerance}
                         disabled={running}
-                        onChange={(e) => setColor(e.target.value)}
+                        onChange={(e) => setTolerance(Number(e.target.value))}
                       />
-                    </label>
+                    </Field>
+                    <Field label={t('Цвет фона')}>
+                      <div className="row tight">
+                        <button
+                          className="btn soft eyedropper"
+                          onClick={() => setPicking(true)}
+                          disabled={running}
+                          title={t('Выбрать цвет фона прямо на картинке')}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden>
+                            <path d="M14 6l4 4M5 19l1-4 8-8 3 3-8 8zM16 4l4 4" />
+                          </svg>
+                          {bgColor ? (
+                            <>
+                              <i className="dot" style={{ background: bgColor }} /> {bgColor}
+                            </>
+                          ) : (
+                            t('Пипетка (сейчас авто)')
+                          )}
+                        </button>
+                        {bgColor && (
+                          <button
+                            className="icon-btn"
+                            title={t('Вернуть автоопределение')}
+                            onClick={() => setBgColor(undefined)}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden>
+                              <path d="M6 6l12 12M18 6L6 18" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </Field>
                   </div>
-                </div>
+                  <div className="options">
+                    <Switch
+                      checked={everywhere}
+                      disabled={running}
+                      onChange={setEverywhere}
+                      label={t('Убирать фон и внутри предметов')}
+                      hint={t('Убирает фон в щелях и отверстиях внутри предметов. Выключите, если на предмете есть свечение такого же цвета, как фон')}
+                    />
+                    <Switch
+                      checked={translucent}
+                      disabled={running}
+                      onChange={setTranslucent}
+                      label={t('Сохранять полупрозрачность (паутина, дымка)')}
+                      hint={t('Паутина, дымка и свечение остаются полупрозрачными, без розовой пелены')}
+                    />
+                  </div>
+                </>
               )}
+            </Section>
 
-              <div className="setting">
-                <label>Формат</label>
-                <div className="chips">
-                  {FORMATS.map((f) => (
-                    <button
-                      key={f.id}
-                      className={`chip ${format === f.id ? 'active' : ''}`}
-                      onClick={() => setFormat(f.id)}
-                      title={f.hint}
-                      disabled={running || (f.id === 'jpg' && mode === 'transparent')}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <Section title={t('Результат')}>
+              <div className="options">
+                <Field label={t('Фон результата')}>
+                  <Segmented
+                    value={mode}
+                    disabled={running}
+                    onChange={setMode}
+                    options={[
+                      { id: 'transparent', label: t('Прозрачный') },
+                      { id: 'color', label: t('Цвет') }
+                    ]}
+                  />
+                </Field>
 
-              <div className="setting">
-                <label>Сохранить</label>
-                <div className="row tight">
-                  <button className="btn soft" onClick={pickFolder} disabled={running}>
-                    {outputDir ? 'Другая папка…' : 'Рядом с оригиналом'}
-                  </button>
-                  {outputDir && (
-                    <button
-                      className="icon-btn"
-                      title="Сбросить"
-                      onClick={() => setOutputDir(undefined)}
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden>
-                        <path d="M6 6l12 12M18 6L6 18" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <footer className="action-bar">
-              <div className="muted">
-                {allDone ? (
-                  <>🎉 Готово! Обработано фото: <b>{stats.done}</b></>
-                ) : outputDir ? (
-                  <>Результат: {outputDir}</>
-                ) : (
-                  <>Оригиналы не изменяются — рядом появятся новые файлы</>
+                {mode === 'color' && (
+                  <Field label={t('Цвет')}>
+                    <div className="swatches">
+                      {SWATCHES.map((c) => (
+                        <button
+                          key={c}
+                          className={`swatch ${color === c ? 'active' : ''}`}
+                          style={{ background: c }}
+                          onClick={() => setColor(c)}
+                          disabled={running}
+                          aria-label={c}
+                        />
+                      ))}
+                      <label className="swatch custom" title={t('Свой цвет')}>
+                        <input
+                          type="color"
+                          value={color}
+                          disabled={running}
+                          onChange={(e) => setColor(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                  </Field>
                 )}
+
+                <Field label={t('Формат')}>
+                  <Segmented
+                    value={format}
+                    disabled={running}
+                    onChange={setFormat}
+                    options={FORMATS.filter((f) => !(f.id === 'jpg' && mode === 'transparent')).map((f) => ({
+                      id: f.id,
+                      label: f.label,
+                      hint: t(f.hint)
+                    }))}
+                  />
+                </Field>
               </div>
-              {running ? (
-                <button className="btn danger" onClick={() => window.api.cancel()}>
-                  Остановить
-                </button>
-              ) : (
-                <button className="btn primary" onClick={start} disabled={allDone || !canStart}>
-                  {allDone
-                    ? 'Готово'
-                    : !canStart
-                      ? 'Сначала скачайте модель'
-                      : `Убрать фон${files.length > 1 ? ` (${files.length})` : ''}`}
+            </Section>
+          </div>
+
+          <footer className="action-bar cv-footer">
+            <div className="cv-dest">
+              <button className="btn soft" onClick={pickFolder} disabled={running} title={outputDir}>
+                <svg viewBox="0 0 24 24" aria-hidden>
+                  <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                </svg>
+                {outputDir ? outputDir.split(/[\\/]/).filter(Boolean).pop() : t('Рядом с оригиналом')}
+              </button>
+              {outputDir && (
+                <button className="icon-btn" title={t('Сбросить')} onClick={() => setOutputDir(undefined)}>
+                  <svg viewBox="0 0 24 24" aria-hidden>
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
                 </button>
               )}
-            </footer>
-          </section>
+              <span className="muted small">
+                {allDone ? (
+                  <>
+                    🎉 {t('Готово! Обработано фото:')} <b>{stats.done}</b>
+                  </>
+                ) : (
+                  t('Оригиналы не изменяются')
+                )}
+              </span>
+            </div>
+            {running ? (
+              <button className="btn danger" onClick={() => window.api.cancel()}>
+                {t('Остановить')}
+              </button>
+            ) : (
+              <button className="btn primary" onClick={start} disabled={allDone || !canStart}>
+                {allDone
+                  ? t('Готово')
+                  : !canStart
+                    ? t('Сначала скачайте модель')
+                    : `${t('Убрать фон')}${files.length > 1 ? ` (${files.length})` : ''}`}
+              </button>
+            )}
+          </footer>
         </>
       )}
     </div>

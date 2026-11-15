@@ -1,5 +1,7 @@
+import { INPUT_IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from '@shared/types'
 import type { FileItem, JobProgress } from '@shared/types'
 import { formatBytes, formatDuration } from '../lib'
+import { useI18n } from '../i18n'
 
 interface Props {
   files: FileItem[]
@@ -8,8 +10,22 @@ interface Props {
   onRemove: (id: string) => void
   /** Показывать превью результата (с шахматным фоном для прозрачности) вместо исходника */
   previewResult?: boolean
+  /** Плотный список: меньше места, когда ниже много настроек */
+  compact?: boolean
+  /** Список лежит внутри общей прокрутки и не прокручивается сам */
+  flow?: boolean
   /** Если задано — у готовых файлов появляется кнопка «Править» */
   onEdit?: (file: FileItem, result: JobProgress) => void
+  /** Если задано — у готовых картинок и видео появляется кнопка «Сравнить» */
+  onCompare?: (file: FileItem, result: JobProgress) => void
+}
+
+/** Сравнивать можно картинку с картинкой и видео с видео. */
+function comparable(f: FileItem, outputPath: string): boolean {
+  const ext = outputPath.split('.').pop()?.toLowerCase() ?? ''
+  if (f.kind === 'image') return INPUT_IMAGE_EXTENSIONS.includes(ext) && ext !== 'gif'
+  if (f.kind === 'video') return VIDEO_EXTENSIONS.includes(ext)
+  return false
 }
 
 export default function FileList({
@@ -18,10 +34,14 @@ export default function FileList({
   running,
   onRemove,
   previewResult,
-  onEdit
+  compact,
+  flow,
+  onEdit,
+  onCompare
 }: Props): React.JSX.Element {
+  const { t } = useI18n()
   return (
-    <ul className="file-list">
+    <ul className={`file-list ${compact ? 'compact' : ''} ${flow ? 'flow' : ''}`}>
       {files.map((f) => {
         const p = progress[f.id]
         const showResult = previewResult && p?.status === 'done' && p.preview
@@ -32,6 +52,8 @@ export default function FileList({
                 <img src={p.preview} alt="" />
               ) : f.thumbnail ? (
                 <img src={f.thumbnail} alt="" />
+              ) : f.kind === 'folder' ? (
+                <span className="audio-icon">📁</span>
               ) : f.kind === 'audio' ? (
                 <span className="audio-icon">♪</span>
               ) : (
@@ -43,13 +65,13 @@ export default function FileList({
                 {f.name}
               </div>
               <div className="muted">
-                {f.ext.toUpperCase()} · {formatBytes(f.size)}
+                {f.kind === 'folder' ? t('Папка') : `${f.ext.toUpperCase()} · ${formatBytes(f.size)}`}
                 {f.width && f.height ? ` · ${f.width}×${f.height}` : ''}
                 {f.duration ? ` · ${formatDuration(f.duration)}` : ''}
                 {p?.status === 'done' && p.info ? ` · ${p.info}` : ''}
               </div>
               {p?.status === 'working' && p.percent !== undefined && (
-                <div className="file-bar" aria-label="Ход работы">
+                <div className="file-bar" aria-label={t('Ход работы')}>
                   <div style={{ width: `${Math.round(p.percent)}%` }} />
                 </div>
               )}
@@ -59,11 +81,11 @@ export default function FileList({
               {p?.status === 'working' && p.percent !== undefined && (
                 <span className="muted percent">{Math.round(p.percent)}%</span>
               )}
-              {p?.status === 'working' && <span className="spinner" aria-label="Обработка" />}
-              {p?.status === 'pending' && <span className="muted">В очереди</span>}
+              {p?.status === 'working' && <span className="spinner" aria-label={t('Обработка')} />}
+              {p?.status === 'pending' && <span className="muted">{t('В очереди')}</span>}
               {p?.status === 'error' && (
                 <span className="error error-text" title={p.error}>
-                  {p.error && p.error.length <= 60 ? p.error : 'Не получилось'}
+                  {p.error && p.error.length <= 60 ? p.error : t('Не получилось')}
                 </span>
               )}
               {p?.status === 'done' && p.outputPath && (
@@ -76,12 +98,20 @@ export default function FileList({
                         {Math.abs(Math.round((1 - p.outputSize / f.size) * 100))}%
                       </b>
                     )}
-                    {previewResult && <b className="good">Готово</b>}
+                    {previewResult && <b className="good">{t('Готово')}</b>}
                   </span>
+                  {onCompare && comparable(f, p.outputPath) && (
+                    <button className="icon-btn" title={t('Сравнить до и после')} disabled={running} onClick={() => onCompare(f, p)}>
+                      <svg viewBox="0 0 24 24" aria-hidden>
+                        <rect x="3" y="5" width="18" height="14" rx="3" />
+                        <path d="M12 5v14M8.5 10l-2 2 2 2M15.5 10l2 2-2 2" />
+                      </svg>
+                    </button>
+                  )}
                   {onEdit && (
                     <button
                       className="icon-btn"
-                      title="Править кистью"
+                      title={t('Править кистью')}
                       disabled={running}
                       onClick={() => onEdit(f, p)}
                     >
@@ -92,7 +122,7 @@ export default function FileList({
                   )}
                   <button
                     className="icon-btn"
-                    title="Показать в папке"
+                    title={t('Показать в папке')}
                     onClick={() => window.api.revealInFolder(p.outputPath!)}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden>
@@ -104,7 +134,7 @@ export default function FileList({
             </div>
 
             {!running && (
-              <button className="icon-btn remove" title="Убрать" onClick={() => onRemove(f.id)}>
+              <button className="icon-btn remove" title={t('Убрать')} onClick={() => onRemove(f.id)}>
                 <svg viewBox="0 0 24 24" aria-hidden>
                   <path d="M6 6l12 12M18 6L6 18" />
                 </svg>

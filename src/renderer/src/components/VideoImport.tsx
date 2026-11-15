@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { GifProgress, VideoExtractResult, VideoInfo } from '@shared/types'
 import Modal from './Modal'
+import { tr, useI18n } from '../i18n'
 
 interface Props {
   path: string
@@ -11,10 +12,11 @@ interface Props {
 const MAX_FRAMES = 400
 const WIDTHS = [720, 480, 320, 240]
 
-const fmt = (s: number): string => `${s.toFixed(1)} с`
+const fmt = (s: number): string => tr('{n} с', { n: s.toFixed(1) })
 
 /** Выбор отрезка видео: начало, длина, частота кадров и ширина. */
 export default function VideoImport({ path, onClose, onImport }: Props): React.JSX.Element {
+  const { t } = useI18n()
   const [info, setInfo] = useState<VideoInfo | null>(null)
   const [poster, setPoster] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -49,7 +51,7 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
   useEffect(() => {
     if (!info) return
     let cancelled = false
-    const t = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       window.api
         .videoPoster(path, start, 520)
         .then((url) => !cancelled && setPoster(url))
@@ -57,7 +59,7 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
     }, 220)
     return () => {
       cancelled = true
-      window.clearTimeout(t)
+      window.clearTimeout(timer)
     }
   }, [info, path, start])
 
@@ -72,7 +74,7 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
     if (!info) return
     setBusy(true)
     setError(null)
-    setProgress({ text: 'Начинаю…', done: 0, total: 1 })
+    setProgress({ text: t('Начинаю…'), done: 0, total: 1 })
     try {
       const result = await window.api.extractVideoFrames({
         path,
@@ -92,18 +94,18 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
 
   return (
     <Modal
-      title="GIF из видео"
+      title={t('GIF из видео')}
       onClose={busy ? () => undefined : onClose}
       footer={
         <>
           <span className="muted small">
-            {info ? `≈ ${Math.min(frames, MAX_FRAMES)} кадров из ${fmt(usedLength)}` : ''}
+            {info ? t('≈ {n} кадров из {len}', { n: Math.min(frames, MAX_FRAMES), len: fmt(usedLength) }) : ''}
           </span>
           <button className="btn ghost" onClick={onClose} disabled={busy}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn primary" onClick={extract} disabled={!info || busy}>
-            {busy ? 'Извлекаю…' : 'Извлечь кадры'}
+            {busy ? t('Извлекаю…') : t('Извлечь кадры')}
           </button>
         </>
       }
@@ -111,19 +113,19 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
       {error && !info ? (
         <div className="error">{error}</div>
       ) : !info ? (
-        <div className="muted">Читаю видео…</div>
+        <div className="muted">{t('Читаю видео…')}</div>
       ) : (
         <div className="video-import">
           <div className="video-poster">
-            {poster ? <img src={poster} alt="Кадр видео" /> : <span className="muted">Загружаю кадр…</span>}
+            {poster ? <img src={poster} alt={t('Кадр видео')} /> : <span className="muted">{t('Загружаю кадр…')}</span>}
           </div>
           <div className="muted small video-meta">
-            {info.name} · {fmt(info.duration)} · {info.width}×{info.height} · {Math.round(info.fps)} кадр/с
+            {t('{name} · {dur} · {w}×{h} · {fps} кадр/с', { name: info.name, dur: fmt(info.duration), w: info.width, h: info.height, fps: Math.round(info.fps) })}
           </div>
 
           <label className="video-field">
             <span>
-              Начало <b>{fmt(start)}</b>
+              {t('Начало')} <b>{fmt(start)}</b>
             </span>
             <input
               type="range"
@@ -138,7 +140,7 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
 
           <label className="video-field">
             <span>
-              Длина отрезка <b>{fmt(safeLength)}</b>
+              {t('Длина отрезка')} <b>{fmt(safeLength)}</b>
             </span>
             <input
               type="range"
@@ -153,7 +155,7 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
 
           <label className="video-field">
             <span>
-              Частота <b>{fps} кадр/с</b>
+              {t('Частота')} <b>{t('{n} кадр/с', { n: fps })}</b>
             </span>
             <input
               type="range"
@@ -167,7 +169,7 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
           </label>
 
           <div className="video-field">
-            <span>Ширина кадров</span>
+            <span>{t('Ширина кадров')}</span>
             <div className="chips">
               {WIDTHS.filter((w) => w < info.width).map((w) => (
                 <button
@@ -184,15 +186,14 @@ export default function VideoImport({ path, onClose, onImport }: Props): React.J
                 onClick={() => setWidth(undefined)}
                 disabled={busy}
               >
-                Как в видео
+                {t('Как в видео')}
               </button>
             </div>
           </div>
 
           {tooMany && (
             <div className="muted small warn">
-              Слишком много кадров (больше {MAX_FRAMES}): отрезок обрежется до {fmt(usedLength)}. Уменьшите
-              частоту или длину.
+              {t('Слишком много кадров (больше {max}): отрезок обрежется до {len}. Уменьшите частоту или длину.', { max: MAX_FRAMES, len: fmt(usedLength) })}
             </div>
           )}
           {busy && progress && (

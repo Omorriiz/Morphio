@@ -1,4 +1,5 @@
 // Типы, общие для main, preload и renderer.
+import type { Language, LanguageSetting } from './i18n'
 
 export type ImageFormat = 'png' | 'jpg' | 'webp' | 'avif' | 'tiff' | 'gif'
 
@@ -24,6 +25,15 @@ export const INPUT_IMAGE_EXTENSIONS = [
   'png', 'jpg', 'jpeg', 'webp', 'avif', 'tif', 'tiff', 'gif', 'bmp', 'svg', 'heic', 'heif'
 ]
 
+/** Вид файла: по нему реестр форматов решает, во что его можно превратить. */
+export type FileKind = 'image' | 'video' | 'audio' | 'table' | 'archive' | 'pdf' | 'document' | 'folder' | 'other'
+
+export const TABLE_EXTENSIONS = ['csv', 'tsv', 'xlsx', 'json', 'xml', 'yaml', 'yml']
+export const PDF_EXTENSIONS = ['pdf']
+/** Текстовые документы и книги (читает Pandoc) */
+export const DOCUMENT_EXTENSIONS = ['docx', 'odt', 'rtf', 'html', 'htm', 'md', 'markdown', 'txt', 'epub', 'fb2', 'mobi', 'azw3']
+export const ARCHIVE_EXTENSIONS = ['zip', '7z', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'rar']
+
 export interface FileItem {
   id: string
   path: string
@@ -36,7 +46,7 @@ export interface FileItem {
   height?: number
   /** Для видео и звука: длительность в секундах */
   duration?: number
-  kind?: 'video' | 'audio'
+  kind?: FileKind
   /** Есть ли в файле звуковая дорожка */
   hasAudio?: boolean
 }
@@ -153,6 +163,25 @@ export interface MaskEditSession {
   imageUrl: string
   /** Маска прозрачности (PNG data URL, оттенки серого) */
   maskUrl: string
+}
+
+export type CompareVerdict = 'invisible' | 'small' | 'noticeable' | 'big'
+
+/** Пара «до/после» для слайдера: два кадра одного размера и оценка потери качества. */
+export interface CompareResult {
+  before: string
+  after: string
+  width: number
+  height: number
+  originalWidth: number
+  originalHeight: number
+  sizeBefore: number
+  sizeAfter: number
+  psnr: number
+  ssim: number
+  verdict: CompareVerdict
+  /** Длительность видео в секундах (для картинок нет) */
+  duration?: number
 }
 
 export interface ImagePreview {
@@ -318,17 +347,160 @@ export interface GifProgress {
   total: number
 }
 
+/** Правило следящей папки: что появилось в папке, то конвертируется выбранным способом. */
+export interface WatchRule {
+  id: string
+  folder: string
+  enabled: boolean
+  /** Вариант из реестра форматов, например image:webp */
+  target: string
+  quality: number
+  /** Куда класть результат; по умолчанию подпапка Morphio-out внутри следимой папки */
+  outputDir?: string
+}
+
+export interface WatchStatus {
+  id: string
+  active: boolean
+  processed: number
+  lastFile?: string
+  lastAt?: number
+  lastError?: string
+}
+
+/** Настройки приложения (файл settings.json в %APPDATA%\Morphio). */
+export type ThemeSetting = 'system' | 'light' | 'dark'
+
+export interface AppSettings {
+  version: 1
+  language: LanguageSetting
+  /** Оформление: как в Windows, светлое или тёмное */
+  theme: ThemeSetting
+  /** Значок в трее */
+  tray: boolean
+  /** Закрытие окна прячет его в трей, приложение продолжает работать */
+  closeToTray: boolean
+  launchAtLogin: boolean
+  /** Окно быстрой конвертации по сочетанию клавиш */
+  quickEnabled: boolean
+  /** Сочетание в формате Electron, например CommandOrControl+Shift+X */
+  hotkey: string
+  /** Пункт «Конвертировать в Morphio» в меню Проводника */
+  explorerMenu: boolean
+  /** Последние выбранные варианты в быстром окне (первыми показываются они) */
+  quickLast: string[]
+  watchRules: WatchRule[]
+}
+
+export const DEFAULT_HOTKEY = 'CommandOrControl+Shift+X'
+
+export interface SettingsState {
+  settings: AppSettings
+  /** Язык, который действует сейчас (если выбран «системный» — уже определён). */
+  language: Language
+  /** Удалось ли занять сочетание клавиш (false — оно занято другой программой) */
+  hotkeyOk: boolean
+  /** Почему не удалось добавить или убрать пункт в меню Проводника */
+  explorerMenuError?: string
+}
+
+/** Один вариант «во что превратить» из реестра форматов. */
+/** Модуль, который докачивается по кнопке (Pandoc и другие) */
+export interface ModuleInfo {
+  id: string
+  name: string
+  version: string
+  description: string
+  license: string
+  /** Откуда скачивается, для показа пользователю */
+  source: string
+  sizeMB: number
+  installed: boolean
+}
+
+export interface ModuleProgress {
+  id: string
+  phase: 'download' | 'extract' | 'done' | 'error'
+  received: number
+  total: number
+  error?: string
+}
+
+export interface UniversalTarget {
+  /** engine:формат, например image:webp, table:xlsx, archive:unpack */
+  id: string
+  label: string
+  /** Раздел в списке вариантов */
+  group: FileKind
+  hint: string
+  /** Нужен модуль (например pandoc) */
+  needs?: string
+  /** Модуль нужен, но ещё не скачан */
+  missing?: boolean
+}
+
+export interface UniversalOptions {
+  target: string
+  /** Качество картинок, 1–100 */
+  quality: number
+  outputDir?: string
+  archiveLevel: 'fast' | 'normal' | 'max'
+  /** Пароль для ZIP/7z (необязательно) */
+  password?: string
+  csvDelimiter: ',' | ';' | '\t'
+  /** CSV в UTF-8 с BOM: так русские буквы правильно открываются в Excel */
+  csvBom: boolean
+  /** Картинки: максимальная сторона, px (не задана — как в оригинале) */
+  maxSize?: number
+  /** Картинки: сохранить скрытые данные (GPS, камера). По умолчанию они удаляются. */
+  keepMetadata?: boolean
+  /** Видео и звук: подробные настройки (не заданы — значения по умолчанию) */
+  media?: UniversalMedia
+}
+
+export interface UniversalMedia {
+  quality: 'high' | 'medium' | 'low'
+  /** Максимальная высота кадра (для вертикального видео — ширина); не задана — как в оригинале */
+  maxHeight?: number
+  audioBitrate: number
+  mute: boolean
+  stripMetadata: boolean
+  useGpu: boolean
+  /** Лимит размера результата, МБ (только видео) */
+  targetMB?: number
+}
+
+/** Настройки по умолчанию для действий без окна настроек (быстрое окно, следящие папки). */
+export function defaultUniversalOptions(target: string, outputDir?: string, quality = 85): UniversalOptions {
+  return { target, quality, outputDir, archiveLevel: 'normal', csvDelimiter: ',', csvBom: true }
+}
+
 export interface MorphioApi {
+  watchStatus(): Promise<WatchStatus[]>
+  targetsForKind(kind: FileKind): Promise<UniversalTarget[]>
+  /** Основное окно: пришли файлы из трея, меню Проводника или быстрого окна */
+  onOpenFiles(callback: (paths: string[]) => void): () => void
+  /** Быстрое окно: пришли файлы после нажатия сочетания клавиш */
+  onQuickFiles(callback: (paths: string[]) => void): () => void
+  quickClose(): Promise<void>
+  quickOpenMain(paths: string[]): Promise<void>
+  quickReady(): Promise<void>
+  quickRemember(target: string): Promise<void>
+  /** Основное окно при запуске: файлы, которые пришли из меню Проводника или быстрого окна */
+  takeOpenFiles(): Promise<string[]>
+  pickAny(): Promise<string[]>
+  pickAnyFolder(): Promise<string[]>
+  inspectAny(paths: string[]): Promise<FileItem[]>
+  universalTargets(items: FileItem[]): Promise<UniversalTarget[]>
+  universalConvert(items: FileItem[], options: UniversalOptions): Promise<void>
+  getSettings(): Promise<SettingsState>
+  patchSettings(patch: Partial<AppSettings>): Promise<SettingsState>
   getPathForFile(file: File): string
   pickFiles(): Promise<string[]>
   pickFolder(): Promise<string | undefined>
   inspectFiles(paths: string[]): Promise<FileItem[]>
-  convert(items: FileItem[], options: ConvertOptions): Promise<void>
   removeBackground(items: FileItem[], options: BgRemoveOptions): Promise<void>
-  pickMedia(): Promise<string[]>
-  inspectMedia(paths: string[]): Promise<FileItem[]>
   mediaCapabilities(): Promise<MediaCapabilities>
-  convertMedia(items: FileItem[], options: MediaOptions): Promise<void>
   pickVideo(): Promise<string | undefined>
   videoInfo(path: string): Promise<VideoInfo>
   videoPoster(path: string, time: number, maxSide: number): Promise<string>
@@ -339,6 +511,7 @@ export interface MorphioApi {
   onGifProgress(callback: (progress: GifProgress) => void): () => void
   runPipeline(items: FileItem[], config: PipelineConfig): Promise<void>
   previewImage(path: string, maxSide: number): Promise<ImagePreview>
+  compare(inputPath: string, outputPath: string, time?: number): Promise<CompareResult>
   openMaskEditor(item: FileItem, options: BgRemoveOptions): Promise<MaskEditSession>
   saveMaskEdit(
     item: FileItem,
@@ -351,5 +524,11 @@ export interface MorphioApi {
   revealInFolder(path: string): Promise<void>
   modelStatus(): Promise<ModelStatus>
   downloadModel(): Promise<void>
+  modulesList(): Promise<ModuleInfo[]>
+  modulesInstall(id: string): Promise<void>
+  modulesRemove(id: string): Promise<void>
+  onModuleProgress(callback: (progress: ModuleProgress) => void): () => void
+  /** Найдена ли программа Calibre (нужна для MOBI и AZW3) */
+  calibreFound(): Promise<boolean>
   onModelDownload(callback: (progress: ModelDownloadProgress) => void): () => void
 }

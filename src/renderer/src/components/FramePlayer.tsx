@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { GifFrame } from '@shared/types'
+import { useI18n } from '../i18n'
 
 interface Props {
   /** Кадры в том порядке, в котором они будут проигрываться */
@@ -20,6 +21,7 @@ export default function FramePlayer({
   resultUrl,
   background
 }: Props): React.JSX.Element {
+  const { t } = useI18n()
   const [playing, setPlaying] = useState(true)
   const [index, setIndex] = useState(0)
 
@@ -56,11 +58,11 @@ export default function FramePlayer({
         style={background && background !== 'transparent' ? { background } : undefined}
       >
         {resultUrl ? (
-          <img src={resultUrl} alt="Результат" />
+          <img src={resultUrl} alt={t('Результат')} />
         ) : current ? (
           <img src={current.preview} alt={current.name} />
         ) : (
-          <span className="muted">Нет кадров</span>
+          <span className="muted">{t('Нет кадров')}</span>
         )}
       </div>
       {!resultUrl && frames.length > 0 && (
@@ -68,7 +70,7 @@ export default function FramePlayer({
           <button
             className="icon-btn"
             onClick={() => setPlaying((p) => !p)}
-            title={playing ? 'Пауза' : 'Играть'}
+            title={playing ? t('Пауза') : t('Играть')}
           >
             {playing ? (
               <svg viewBox="0 0 24 24" aria-hidden>
@@ -89,7 +91,7 @@ export default function FramePlayer({
               setPlaying(false)
               setIndex(Number(e.target.value))
             }}
-            aria-label="Кадр"
+            aria-label={t('Кадр')}
           />
           <span className="muted small">
             {Math.min(index, frames.length - 1) + 1} / {frames.length}

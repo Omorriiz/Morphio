@@ -14,6 +14,8 @@ import FramePlayer from '../components/FramePlayer'
 import FrameStrip from '../components/FrameStrip'
 import { useDropZone } from '../hooks/useDropZone'
 import { formatBytes } from '../lib'
+import { useI18n } from '../i18n'
+import { Segmented } from '../components/ui'
 
 const WIDTHS: { label: string; value?: number }[] = [
   { label: 'Как у первого кадра' },
@@ -38,6 +40,7 @@ const LOOPS: { label: string; value: number }[] = [
 const SWATCHES = ['#ffffff', '#000000', '#f4f1ea', '#22cc88', '#4f8cff']
 
 export default function GifView({ active }: { active: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   const [frames, setFrames] = useState<GifFrame[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -76,7 +79,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
     setError(null)
     try {
       const added = await window.api.inspectFrames(paths)
-      if (added.length === 0) setError('В этих файлах не нашлось картинок')
+      if (added.length === 0) setError(t('В этих файлах не нашлось картинок'))
       setFrames((prev) => [...prev, ...added])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -144,7 +147,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
     setBuilding(true)
     setError(null)
     setNotice(null)
-    setProgress({ text: 'Начинаю…', done: 0, total: 1 })
+    setProgress({ text: t('Начинаю…'), done: 0, total: 1 })
     try {
       const options: GifBuildOptions = {
         format,
@@ -177,7 +180,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
     setError(null)
     try {
       const r = await window.api.exportFrames(frames, dir)
-      setNotice(`Сохранено кадров: ${r.count}. Папка: ${r.dir}`)
+      setNotice(t('Сохранено кадров: {n}. Папка: {dir}', { n: r.count, dir: r.dir }))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -203,24 +206,24 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
 
       <header className="list-head">
         <div>
-          <h2>GIF-студия</h2>
+          <h2>{t('GIF-студия')}</h2>
           <span className="muted">
             {frames.length > 0
-              ? `${frames.length} кадр. · ${(totalMs / 1000).toFixed(1)} с`
-              : 'анимация из картинок'}
+              ? t('{n} кадр. · {s} с', { n: frames.length, s: (totalMs / 1000).toFixed(1) })
+              : t('анимация из картинок')}
           </span>
         </div>
         <div className="row">
           <button className="btn ghost" onClick={pick} disabled={building || loading}>
-            + Картинки
+            {t('+ Картинки')}
           </button>
           <button className="btn ghost" onClick={pickVideo} disabled={building || loading}>
-            + Видео
+            {t('+ Видео')}
           </button>
           {frames.length > 0 && (
             <>
               <button className="btn ghost" onClick={exportPng} disabled={building}>
-                Кадры в PNG
+                {t('Кадры в PNG')}
               </button>
               <button
                 className="btn ghost"
@@ -230,7 +233,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                 }}
                 disabled={building}
               >
-                Очистить
+                {t('Очистить')}
               </button>
             </>
           )}
@@ -240,21 +243,20 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
       {frames.length === 0 ? (
         <div className="empty-state">
           <div className="hero-emoji">🎞️</div>
-          <h1>Соберём анимацию</h1>
+          <h1>{t('Соберём анимацию')}</h1>
           <p>
-            Перетащите картинки, папку с кадрами, готовый GIF или видео: из ролика можно вырезать любой
-            момент
+            {t('Перетащите картинки, папку с кадрами, готовый GIF или видео: из ролика можно вырезать любой момент')}
           </p>
           <div className="row">
             <button className="btn primary big" onClick={pick} disabled={loading}>
-              {loading ? 'Загружаю…' : 'Выбрать картинки'}
+              {loading ? t('Загружаю…') : t('Выбрать картинки')}
             </button>
             <button className="btn soft big" onClick={pickVideo} disabled={loading}>
-              Из видео
+              {t('Из видео')}
             </button>
           </div>
           <span className="hint">
-            Картинки, папка с кадрами, GIF или видео (MP4, MOV, MKV, WebM). Кадры из папки идут по порядку имён
+            {t('Картинки, папка с кадрами, GIF или видео (MP4, MOV, MKV, WebM). Кадры из папки идут по порядку имён')}
           </span>
           {error && <span className="error small">{error}</span>}
         </div>
@@ -272,7 +274,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
             onDelay={setDelay}
           />
           <p className="muted small strip-hint">
-            Перетаскивайте кадры, чтобы поменять порядок. Число под кадром — его задержка в миллисекундах.
+            {t('Перетаскивайте кадры, чтобы поменять порядок. Число под кадром — его задержка в миллисекундах.')}
           </p>
 
           <div className="gif-grid">
@@ -290,23 +292,23 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                     <strong>{formatBytes(result.outputSize)}</strong>
                     <span className="muted">
                       {' '}
-                      · {result.width}×{result.height} · {result.frames} кадр.
+                      · {t('{w}×{h} · {n} кадр.', { w: result.width, h: result.height, n: result.frames })}
                     </span>
                   </div>
                   {result.note && <div className="muted small">{result.note}</div>}
                   {result.reachedTarget === false && (
                     <div className="error small">
-                      Уложиться в {targetMB} МБ не удалось даже с минимальным качеством
+                      {t('Уложиться в {mb} МБ не удалось даже с минимальным качеством', { mb: targetMB })}
                     </div>
                   )}
                   {!result.previewUrl && (
-                    <div className="muted small">Файл большой, превью не показываю</div>
+                    <div className="muted small">{t('Файл большой, превью не показываю')}</div>
                   )}
                   <button
                     className="btn soft"
                     onClick={() => window.api.revealInFolder(result.outputPath)}
                   >
-                    Показать в папке
+                    {t('Показать в папке')}
                   </button>
                 </div>
               )}
@@ -315,24 +317,16 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
             <section className="settings">
               <div className="steps">
                 <div className="step">
-                  <strong>Формат</strong>
-                  <div className="chips">
-                    <button
-                      className={`chip small ${format === 'gif' ? 'active' : ''}`}
-                      onClick={() => setFormat('gif')}
-                      disabled={building}
-                    >
-                      GIF
-                    </button>
-                    <button
-                      className={`chip small ${format === 'webp' ? 'active' : ''}`}
-                      onClick={() => setFormat('webp')}
-                      disabled={building}
-                      title="Легче и красивее GIF, открывается в браузерах и мессенджерах"
-                    >
-                      WebP
-                    </button>
-                  </div>
+                  <strong>{t('Формат')}</strong>
+                  <Segmented
+                    value={format}
+                    disabled={building}
+                    onChange={setFormat}
+                    options={[
+                      { id: 'gif', label: 'GIF' },
+                      { id: 'webp', label: 'WebP', hint: t('Легче и красивее GIF, открывается в браузерах и мессенджерах') }
+                    ]}
+                  />
                   <select
                     value={loop}
                     disabled={building}
@@ -340,17 +334,17 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                   >
                     {LOOPS.map((l) => (
                       <option key={l.value} value={l.value}>
-                        Повтор: {l.label.toLowerCase()}
+                        {t('Повтор: {x}', { x: t(l.label).toLowerCase() })}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="step">
-                  <strong>Скорость</strong>
+                  <strong>{t('Скорость')}</strong>
                   <label className="mini-range">
                     <span>
-                      Задержка <b>{defaultDelay} мс</b> · {fps} кадр/с
+                      {t('Задержка {ms} мс · {fps} кадр/с', { ms: defaultDelay, fps })}
                     </span>
                     <input
                       type="range"
@@ -363,34 +357,26 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                     />
                   </label>
                   <button className="btn soft" onClick={resetDelays} disabled={building}>
-                    Сбросить задержки кадров
+                    {t('Сбросить задержки кадров')}
                   </button>
                 </div>
 
                 <div className="step">
-                  <strong>Порядок</strong>
-                  <div className="chips">
-                    {(
-                      [
-                        ['normal', 'Обычный'],
-                        ['reverse', 'Обратный'],
-                        ['pingpong', 'Туда-обратно']
-                      ] as const
-                    ).map(([id, label]) => (
-                      <button
-                        key={id}
-                        className={`chip small ${order === id ? 'active' : ''}`}
-                        onClick={() => setOrder(id)}
-                        disabled={building}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                  <strong>{t('Порядок')}</strong>
+                  <Segmented
+                    value={order}
+                    disabled={building}
+                    onChange={setOrder}
+                    options={[
+                      { id: 'normal', label: t('Обычный') },
+                      { id: 'reverse', label: t('Обратный') },
+                      { id: 'pingpong', label: t('Туда-обратно') }
+                    ]}
+                  />
                 </div>
 
                 <div className="step">
-                  <strong>Размер</strong>
+                  <strong>{t('Размер')}</strong>
                   <select
                     value={width ?? ''}
                     disabled={building}
@@ -398,36 +384,27 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                   >
                     {WIDTHS.map((w) => (
                       <option key={w.label} value={w.value ?? ''}>
-                        {w.label}
+                        {t(w.label)}
                       </option>
                     ))}
                   </select>
-                  <div className="chips">
-                    <button
-                      className={`chip small ${fit === 'contain' ? 'active' : ''}`}
-                      onClick={() => setFit('contain')}
-                      disabled={building}
-                      title="Кадр целиком, по краям поля"
-                    >
-                      Вписать
-                    </button>
-                    <button
-                      className={`chip small ${fit === 'cover' ? 'active' : ''}`}
-                      onClick={() => setFit('cover')}
-                      disabled={building}
-                      title="Кадр заполняет всё, лишнее обрезается"
-                    >
-                      Заполнить
-                    </button>
-                  </div>
+                  <Segmented
+                    value={fit}
+                    disabled={building}
+                    onChange={setFit}
+                    options={[
+                      { id: 'contain', label: t('Вписать'), hint: t('Кадр целиком, по краям поля') },
+                      { id: 'cover', label: t('Заполнить'), hint: t('Кадр заполняет всё, лишнее обрезается') }
+                    ]}
+                  />
                   <div className="swatches">
                     <button
                       className={`chip small ${background === 'transparent' ? 'active' : ''}`}
                       onClick={() => setBackground('transparent')}
                       disabled={building}
-                      title="Фон полей"
+                      title={t('Фон полей')}
                     >
-                      Прозр.
+                      {t('Прозр.')}
                     </button>
                     {SWATCHES.map((c) => (
                       <button
@@ -443,7 +420,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                 </div>
 
                 <div className="step">
-                  <strong>Качество</strong>
+                  <strong>{t('Качество')}</strong>
                   {format === 'gif' ? (
                     <>
                       <select
@@ -453,7 +430,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                       >
                         {[256, 128, 64, 32, 16].map((c) => (
                           <option key={c} value={c}>
-                            Цветов: {c}
+                            {t('Цветов: {c}', { c })}
                           </option>
                         ))}
                       </select>
@@ -464,13 +441,13 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                           disabled={building}
                           onChange={(e) => setDither(e.target.checked)}
                         />
-                        <span>Сглаживать градиенты</span>
+                        <span>{t('Сглаживать градиенты')}</span>
                       </label>
                     </>
                   ) : (
                     <label className="mini-range">
                       <span>
-                        Качество <b>{quality}%</b>
+                        {t('Качество')} <b>{quality}%</b>
                       </span>
                       <input
                         type="range"
@@ -485,7 +462,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                 </div>
 
                 <div className="step">
-                  <strong>Размер файла</strong>
+                  <strong>{t('Размер файла')}</strong>
                   <label className="check">
                     <input
                       type="checkbox"
@@ -493,11 +470,11 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                       disabled={building}
                       onChange={(e) => setLimitSize(e.target.checked)}
                     />
-                    <span>Уложиться в лимит</span>
+                    <span>{t('Уложиться в лимит')}</span>
                   </label>
                   {limitSize && (
                     <label className="inline-number">
-                      не больше
+                      {t('не больше')}
                       <input
                         type="number"
                         min={0.1}
@@ -507,16 +484,16 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                         disabled={building}
                         onChange={(e) => setTargetMB(Math.max(0.1, Number(e.target.value)))}
                       />
-                      МБ
+                      {t('МБ')}
                     </label>
                   )}
                   <span className="muted small">
-                    Подберём размер и цвета сами (например, для Discord или почты)
+                    {t('Подберём размер и цвета сами (например, для Discord или почты)')}
                   </span>
                 </div>
 
                 <div className="step">
-                  <strong>Файл</strong>
+                  <strong>{t('Файл')}</strong>
                   <input
                     className="text-input"
                     value={name}
@@ -526,10 +503,10 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                   />
                   <div className="row tight">
                     <button className="btn soft" onClick={pickFolder} disabled={building}>
-                      {outputDir ? 'Другая папка…' : 'Рядом с первым кадром'}
+                      {outputDir ? t('Другая папка…') : t('Рядом с первым кадром')}
                     </button>
                     {outputDir && (
-                      <button className="icon-btn" title="Сбросить" onClick={() => setOutputDir(undefined)}>
+                      <button className="icon-btn" title={t('Сбросить')} onClick={() => setOutputDir(undefined)}>
                         <svg viewBox="0 0 24 24" aria-hidden>
                           <path d="M6 6l12 12M18 6L6 18" />
                         </svg>
@@ -558,15 +535,15 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
             ) : notice ? (
               <span className="muted small">{notice}</span>
             ) : result ? (
-              <span className="muted small">🎉 Готово! Файл сохранён.</span>
+              <span className="muted small">{t('🎉 Готово! Файл сохранён.')}</span>
             ) : (
               <span className="muted small">
-                Оригиналы не изменяются. Результат: {format.toUpperCase()} · {(totalMs / 1000).toFixed(1)} с
+                {t('Оригиналы не изменяются. Результат: {fmt} · {s} с', { fmt: format.toUpperCase(), s: (totalMs / 1000).toFixed(1) })}
               </span>
             )}
           </div>
           <button className="btn primary" onClick={build} disabled={building || loading}>
-            {building ? 'Собираю…' : `Создать ${format === 'gif' ? 'GIF' : 'WebP'}`}
+            {building ? t('Собираю…') : t('Создать {fmt}', { fmt: format === 'gif' ? 'GIF' : 'WebP' })}
           </button>
         </footer>
       )}

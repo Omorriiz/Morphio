@@ -10,12 +10,22 @@ files:
   - '!node_modules/onnxruntime-node/bin/napi-v6/linux/**'
   - '!node_modules/onnxruntime-node/bin/napi-v6/darwin/**'
   - '!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**'
+  # 7-Zip: нужен только Windows x64
+  - '!node_modules/7zip-bin/linux/**'
+  - '!node_modules/7zip-bin/mac/**'
+  - '!node_modules/7zip-bin/win/arm64/**'
+  - '!node_modules/7zip-bin/win/ia32/**'
 asarUnpack:
   - node_modules/sharp/**/*
   - node_modules/@img/**/*
   - node_modules/onnxruntime-node/**/*
   # FFmpeg нужно запускать как обычную программу, поэтому он лежит вне архива
   - node_modules/ffmpeg-static/**/*
+  # 7-Zip тоже запускается как отдельная программа
+  - node_modules/7zip-bin/**/*
+  # PDF: отрисовка страниц (нативный холст) и данные шрифтов читаются как обычные файлы
+  - node_modules/@napi-rs/**/*
+  - node_modules/pdfjs-dist/**/*
 win:
   icon: build/icon.ico
   target:

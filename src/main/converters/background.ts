@@ -6,6 +6,7 @@ import type { BgRemoveOptions, FileItem } from '@shared/types'
 import { detectSolidBackground, hex, removeSolidBackground } from './solidBackground'
 import { openImage, type SharpImage } from '../imageInput'
 import { freePath } from '../files'
+import { tm } from '../tm'
 
 const SIZE = 1024
 const MEAN = [0.485, 0.456, 0.406]
@@ -158,17 +159,17 @@ export async function computeCutout(
       height: info.height,
       colors: res.rgb,
       mask: res.alpha,
-      note: `Однотонный фон ${hex(solid.color)}`
+      note: tm('Однотонный фон {color}', { color: hex(solid.color) })
     }
   }
 
   if (!modelPath) {
     throw new Error(
-      'Фон не однотонный, а модель нейросети не скачана. Скачайте её на вкладке «Удалить фон».'
+      tm('Фон не однотонный, а модель нейросети не скачана. Скачайте её на вкладке «Удалить фон».')
     )
   }
   const mask = await predictMask(modelPath, rgb, info.width, info.height)
-  return { width: info.width, height: info.height, colors: rgb, mask, note: 'Нейросеть' }
+  return { width: info.width, height: info.height, colors: rgb, mask, note: tm('Нейросеть') }
 }
 
 /**

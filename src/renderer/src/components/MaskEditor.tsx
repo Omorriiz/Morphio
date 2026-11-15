@@ -7,6 +7,7 @@ import type {
   SavedResult
 } from '@shared/types'
 import Modal from './Modal'
+import { tr, useI18n } from '../i18n'
 
 interface Props {
   item: FileItem
@@ -24,7 +25,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('Не удалось загрузить изображение'))
+    img.onerror = () => reject(new Error(tr('Не удалось загрузить изображение')))
     img.src = src
   })
 
@@ -87,6 +88,7 @@ export default function MaskEditor({
   onSaved,
   onClose
 }: Props): React.JSX.Element {
+  const { t } = useI18n()
   const [session, setSession] = useState<MaskEditSession | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tool, setTool] = useState<'erase' | 'restore'>('erase')
@@ -369,20 +371,19 @@ export default function MaskEditor({
 
   return (
     <Modal
-      title={`Правка маски — ${item.name}`}
+      title={t('Правка маски — {name}', { name: item.name })}
       onClose={onClose}
       wide
       footer={
         <>
           <span className="muted small">
-            E — стереть · R — вернуть · [ ] — размер кисти · колесо — масштаб · пробел или правая
-            кнопка — двигать
+            {t('E — стереть · R — вернуть · [ ] — размер кисти · колесо — масштаб · пробел или правая кнопка — двигать')}
           </span>
           <button className="btn ghost" onClick={onClose} disabled={saving}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn primary" onClick={save} disabled={!changed || saving}>
-            {saving ? 'Сохраняю…' : 'Сохранить'}
+            {saving ? t('Сохраняю…') : t('Сохранить')}
           </button>
         </>
       }
@@ -393,17 +394,17 @@ export default function MaskEditor({
             className={`chip ${tool === 'erase' ? 'active' : ''}`}
             onClick={() => setTool('erase')}
           >
-            Стереть
+            {t('Стереть')}
           </button>
           <button
             className={`chip ${tool === 'restore' ? 'active' : ''}`}
             onClick={() => setTool('restore')}
           >
-            Вернуть
+            {t('Вернуть')}
           </button>
         </div>
         <label className="editor-size">
-          Кисть
+          {t('Кисть')}
           <input
             type="range"
             min={3}
@@ -415,17 +416,17 @@ export default function MaskEditor({
         </label>
         <label className="check">
           <input type="checkbox" checked={ghost} onChange={(e) => setGhost(e.target.checked)} />
-          <span>Показывать стёртое</span>
+          <span>{t('Показывать стёртое')}</span>
         </label>
         <div className="row tight">
           <button className="btn soft" onClick={undo} disabled={history.undo === 0}>
-            ↶ Отменить
+            {t('↶ Отменить')}
           </button>
           <button className="btn soft" onClick={redo} disabled={history.redo === 0}>
-            ↷ Повторить
+            {t('↷ Повторить')}
           </button>
           <button className="btn soft" onClick={fit}>
-            По размеру
+            {t('По размеру')}
           </button>
         </div>
       </div>
@@ -441,7 +442,7 @@ export default function MaskEditor({
         onContextMenu={(e) => e.preventDefault()}
         onWheel={onWheel}
       >
-        {!session && !error && <div className="muted center">Ищу объект…</div>}
+        {!session && !error && <div className="muted center">{t('Ищу объект…')}</div>}
         {error && <div className="error center">{error}</div>}
         <canvas
           ref={viewCanvas}

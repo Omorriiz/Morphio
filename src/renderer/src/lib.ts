@@ -1,3 +1,5 @@
+import { tr } from './i18n'
+
 /** 75 → «1:15», 3725 → «1:02:05». */
 export function formatDuration(seconds: number): string {
   const s = Math.round(seconds)
@@ -9,7 +11,7 @@ export function formatDuration(seconds: number): string {
 }
 
 export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} Б`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
+  if (bytes < 1024) return tr('{n} Б', { n: bytes })
+  if (bytes < 1024 * 1024) return tr('{n} КБ', { n: (bytes / 1024).toFixed(0) })
+  return tr('{n} МБ', { n: (bytes / 1024 / 1024).toFixed(1) })
 }

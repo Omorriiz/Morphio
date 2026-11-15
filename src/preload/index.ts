@@ -1,17 +1,37 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { MorphioApi, GifProgress, JobProgress, ModelDownloadProgress } from '@shared/types'
+import type { MorphioApi, GifProgress, JobProgress, ModelDownloadProgress, ModuleProgress } from '@shared/types'
 
 const api: MorphioApi = {
+  watchStatus: () => ipcRenderer.invoke('watch:status'),
+  targetsForKind: (kind) => ipcRenderer.invoke('any:targets-for-kind', kind),
+  onOpenFiles: (callback) => {
+    const listener = (_: unknown, paths: string[]): void => callback(paths)
+    ipcRenderer.on('app:open-files', listener)
+    return () => ipcRenderer.removeListener('app:open-files', listener)
+  },
+  onQuickFiles: (callback) => {
+    const listener = (_: unknown, paths: string[]): void => callback(paths)
+    ipcRenderer.on('quick:files', listener)
+    return () => ipcRenderer.removeListener('quick:files', listener)
+  },
+  quickClose: () => ipcRenderer.invoke('quick:close'),
+  quickOpenMain: (paths) => ipcRenderer.invoke('quick:open-main', paths),
+  quickReady: () => ipcRenderer.invoke('quick:ready'),
+  quickRemember: (target) => ipcRenderer.invoke('quick:remember', target),
+  takeOpenFiles: () => ipcRenderer.invoke('app:take-open-files'),
+  pickAny: () => ipcRenderer.invoke('any:pick'),
+  pickAnyFolder: () => ipcRenderer.invoke('any:pick-folder'),
+  inspectAny: (paths) => ipcRenderer.invoke('any:inspect', paths),
+  universalTargets: (items) => ipcRenderer.invoke('any:targets', items),
+  universalConvert: (items, options) => ipcRenderer.invoke('any:convert', items, options),
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  patchSettings: (patch) => ipcRenderer.invoke('settings:patch', patch),
   getPathForFile: (file) => webUtils.getPathForFile(file),
   pickFiles: () => ipcRenderer.invoke('files:pick'),
   pickFolder: () => ipcRenderer.invoke('folder:pick'),
   inspectFiles: (paths) => ipcRenderer.invoke('files:inspect', paths),
-  convert: (items, options) => ipcRenderer.invoke('convert:start', items, options),
   removeBackground: (items, options) => ipcRenderer.invoke('bg:start', items, options),
-  pickMedia: () => ipcRenderer.invoke('media:pick'),
-  inspectMedia: (paths) => ipcRenderer.invoke('media:inspect', paths),
   mediaCapabilities: () => ipcRenderer.invoke('media:caps'),
-  convertMedia: (items, options) => ipcRenderer.invoke('media:convert', items, options),
   pickVideo: () => ipcRenderer.invoke('video:pick'),
   videoInfo: (path) => ipcRenderer.invoke('video:info', path),
   videoPoster: (path, time, maxSide) => ipcRenderer.invoke('video:poster', path, time, maxSide),
@@ -26,11 +46,21 @@ const api: MorphioApi = {
   },
   runPipeline: (items, config) => ipcRenderer.invoke('pipeline:start', items, config),
   previewImage: (path, maxSide) => ipcRenderer.invoke('files:preview', path, maxSide),
+  compare: (inputPath, outputPath, time) => ipcRenderer.invoke('compare:pair', inputPath, outputPath, time),
   openMaskEditor: (item, options) => ipcRenderer.invoke('bg:edit-open', item, options),
   saveMaskEdit: (item, options, strokes, outputPath) =>
     ipcRenderer.invoke('bg:edit-save', item, options, strokes, outputPath),
   modelStatus: () => ipcRenderer.invoke('model:status'),
   downloadModel: () => ipcRenderer.invoke('model:download'),
+  modulesList: () => ipcRenderer.invoke('modules:list'),
+  modulesInstall: (id) => ipcRenderer.invoke('modules:install', id),
+  modulesRemove: (id) => ipcRenderer.invoke('modules:remove', id),
+  calibreFound: () => ipcRenderer.invoke('modules:calibre'),
+  onModuleProgress: (callback) => {
+    const listener = (_: unknown, p: ModuleProgress): void => callback(p)
+    ipcRenderer.on('modules:progress', listener)
+    return () => ipcRenderer.removeListener('modules:progress', listener)
+  },
   onModelDownload: (callback) => {
     const listener = (_: unknown, p: ModelDownloadProgress): void => callback(p)
     ipcRenderer.on('model:progress', listener)

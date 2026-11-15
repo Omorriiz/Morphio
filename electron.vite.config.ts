@@ -13,6 +13,15 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react()],
+    // Две страницы: основное окно и быстрое окно по сочетанию клавиш
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          quick: resolve('src/renderer/quick.html')
+        }
+      }
+    },
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Modal from './Modal'
+import { useI18n } from '../i18n'
 
 interface Props {
   /** Файл, на котором выбирается цвет фона */
@@ -12,6 +13,7 @@ const hex2 = (n: number): string => n.toString(16).padStart(2, '0')
 
 /** Пипетка: показывает картинку, по клику берёт цвет пикселя как цвет фона. */
 export default function ColorPicker({ path, onPick, onClose }: Props): React.JSX.Element {
+  const { t } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +55,7 @@ export default function ColorPicker({ path, onPick, onClose }: Props): React.JSX
 
   return (
     <Modal
-      title="Пипетка: кликните по цвету фона"
+      title={t('Пипетка: кликните по цвету фона')}
       onClose={onClose}
       wide
       footer={
@@ -64,18 +66,18 @@ export default function ColorPicker({ path, onPick, onClose }: Props): React.JSX
                 <i style={{ background: hover }} /> {hover}
               </>
             ) : (
-              <span className="muted">Наведите курсор на фон</span>
+              <span className="muted">{t('Наведите курсор на фон')}</span>
             )}
           </span>
           <button className="btn ghost" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
         </>
       }
     >
       <div className="picker-stage">
-        {loading && !error && <div className="muted center">Загружаю…</div>}
-        {error && <div className="error center">Не удалось открыть изображение: {error}</div>}
+        {loading && !error && <div className="muted center">{t('Загружаю…')}</div>}
+        {error && <div className="error center">{t('Не удалось открыть изображение:')} {error}</div>}
         <canvas
           ref={canvasRef}
           className="picker-canvas"

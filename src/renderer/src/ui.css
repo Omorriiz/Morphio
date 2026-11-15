@@ -1,0 +1,762 @@
+/* =====================================================================
+   Общие элементы интерфейса и объединённые экраны.
+   Подключается после styles.css и дополняет его.
+   ===================================================================== */
+
+/* Видимый фокус для работы с клавиатуры */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Боковая панель: разделы сверху, настройки и подсказка внизу */
+.sidebar-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-foot .privacy {
+  margin-top: 4px;
+}
+
+.sidebar-foot .lang-switch {
+  margin-top: 0;
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+}
+
+/* Переключатель-«таблетка» из нескольких вариантов */
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.segmented button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.segmented button:hover:not(:disabled):not(.active) {
+  color: var(--text);
+}
+
+.segmented button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(20, 20, 40, 0.14);
+}
+
+.segmented button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Выключатель */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 550;
+  user-select: none;
+}
+
+.switch.disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 21px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 0.18s;
+}
+
+.switch-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s;
+}
+
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(15px);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Такие же выключатели вместо флажков на остальных экранах */
+.check input[type='checkbox'] {
+  appearance: none;
+  flex: none;
+  width: 36px;
+  height: 21px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  transition: background 0.18s;
+  cursor: pointer;
+}
+
+.check input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s;
+}
+
+.check input[type='checkbox']:checked {
+  background: var(--accent);
+}
+
+.check input[type='checkbox']:checked::after {
+  transform: translateX(15px);
+}
+
+.check input[type='checkbox']:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Поле с подписью */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.field.grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Раздел страницы */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+/* Конвертер: прокручиваемая область под списком файлов */
+.cv-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 2px 6px 6px 2px;
+  margin-right: -6px;
+}
+
+.cv-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cv-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+
+.file-list.compact .file-card {
+  padding: 6px 10px 6px 8px;
+  box-shadow: none;
+}
+
+.file-list.compact .thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.cv-footer {
+  margin-top: 14px;
+}
+
+.cv-dest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cv-dest .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cv-dest .btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Выбор результата: карточки форматов с подписью */
+.target-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preset-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.format-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.format-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  border-radius: 14px;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s, box-shadow 0.15s;
+}
+
+.format-card b {
+  font-size: 14px;
+}
+
+.format-card span {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.format-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.format-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.format-card.active b {
+  color: var(--accent);
+}
+
+.format-card:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Настройки выбранного результата */
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  align-items: flex-start;
+}
+
+.options .field > select,
+.options .field > input[type='range'] {
+  min-width: 190px;
+}
+
+.more {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+}
+
+.more summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  list-style: none;
+  user-select: none;
+}
+
+.more summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 16px;
+  transition: transform 0.15s;
+}
+
+.more[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.more[open] summary {
+  margin-bottom: 14px;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.notice.warn {
+  background: color-mix(in srgb, var(--bad) 14%, var(--surface));
+  color: var(--bad);
+}
+
+.inline-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.inline-number input {
+  width: 76px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+/* Приветственный экран */
+.empty-state.hero {
+  background:
+    radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent),
+    var(--surface);
+  gap: 14px;
+}
+
+.kind-pills {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.kind-pills li {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* «Фото и фон»: две части в одном разделе */
+.subtabs {
+  margin-bottom: 14px;
+}
+
+.subview {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+
+.subview[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Список файлов внутри общей прокрутки: растёт по содержимому, а длинный список прокручивается сам */
+.file-list.compact {
+  flex: none;
+  max-height: 232px;
+  margin: 0;
+  padding-right: 4px;
+}
+
+.target-more {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.target-more[open] summary {
+  margin-bottom: 10px;
+}
+
+.file-list.flow {
+  flex: none;
+  overflow: visible;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Цепочки: нумерованные шаги */
+.pipe-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pipe-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.pipe-step:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.pipe-step .step-num {
+  margin-top: 1px;
+}
+
+.pipe-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Подсказка «перетащите файлы» там, где экран нужен и без файлов */
+.drop-hint {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 2px dashed var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.drop-hint > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drop-hint .hero-emoji {
+  font-size: 30px;
+  margin: 0;
+}
+
+/* Кнопка настроек: только значок, справа от названия приложения */
+.brand .brand-name {
+  flex: 1;
+}
+
+.settings-btn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s, transform 0.3s;
+}
+
+.settings-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  transform: rotate(45deg);
+}
+
+.settings-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.sidebar .privacy {
+  margin-top: auto;
+}
+
+/* Слайдер «до/после» */
+.cmp-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cmp-side {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.cmp-side.right {
+  justify-content: flex-end;
+}
+
+.cmp-tag {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cmp-tag.accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.cmp-view {
+  position: relative;
+  flex: 1;
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 14px;
+  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--bg) 0 50%) 0 / 20px 20px;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.cmp-view.zoomed {
+  cursor: grab;
+}
+
+.cmp-stage {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: 100%;
+  transform-origin: center;
+}
+
+.cmp-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+.cmp-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.cmp-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #333;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  cursor: ew-resize;
+}
+
+.cmp-handle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cmp-busy {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.cmp-time {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cmp-time input {
+  flex: 1;
+}
+
+.cmp-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cmp-zoom-val {
+  min-width: 58px;
+  padding: 6px 8px;
+}
+
+.cmp-verdict {
+  margin-right: auto;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--surface-2);
+}
+
+.cmp-verdict.good {
+  color: var(--good);
+}
+
+.cmp-verdict.warn {
+  color: #d98a00;
+}
+
+.cmp-verdict.bad {
+  color: #d64545;
+}
+
+/* Модули по требованию */
+.module-dl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  margin-top: 6px;
+}
+
+.module-dl .progress {
+  width: min(360px, 100%);
+}
+
+.module-row {
+  align-items: flex-start;
+}
+
+.module-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}

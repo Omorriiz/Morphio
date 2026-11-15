@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import type { GifFrame } from '@shared/types'
+import { useI18n } from '../i18n'
 
 interface Props {
   frames: GifFrame[]
@@ -25,6 +26,7 @@ export default function FrameStrip({
   onDuplicate,
   onDelay
 }: Props): React.JSX.Element {
+  const { t } = useI18n()
   const dragFrom = useRef<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
 
@@ -66,7 +68,7 @@ export default function FrameStrip({
             {!disabled && (
               <div className="frame-actions">
                 <button
-                  title="Дублировать кадр"
+                  title={t('Дублировать кадр')}
                   onClick={(e) => {
                     e.stopPropagation()
                     onDuplicate(f.id)
@@ -75,7 +77,7 @@ export default function FrameStrip({
                   ⧉
                 </button>
                 <button
-                  title="Убрать кадр"
+                  title={t('Убрать кадр')}
                   onClick={(e) => {
                     e.stopPropagation()
                     onRemove(f.id)
@@ -98,9 +100,9 @@ export default function FrameStrip({
               onChange={(e) =>
                 onDelay(f.id, e.target.value === '' ? undefined : Math.max(20, Number(e.target.value)))
               }
-              title="Задержка этого кадра, мс (пусто — общая)"
+              title={t('Задержка этого кадра, мс (пусто — общая)')}
             />
-            <span>мс</span>
+            <span>{t('мс')}</span>
           </label>
         </li>
       ))}

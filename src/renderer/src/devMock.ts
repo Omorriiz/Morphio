@@ -1,4 +1,10 @@
+import { detectLanguage, translate } from '@shared/i18n'
+import type { Language } from '@shared/i18n'
+import { AUDIO_TARGETS, IMAGE_FORMATS, VIDEO_TARGETS } from '@shared/types'
 import type {
+  UniversalTarget,
+  AppSettings,
+  SettingsState,
   MorphioApi,
   FileItem,
   GifProgress,
@@ -47,8 +53,80 @@ function demoSprite(): { image: HTMLCanvasElement; mask: HTMLCanvasElement } {
  * Заглушка window.api — нужна только чтобы открывать интерфейс в обычном браузере
  * во время разработки (без Electron). В сборке приложения не используется.
  */
+let mockSettings: AppSettings = {
+  version: 1,
+  language: 'system',
+  theme: 'system',
+  tray: false,
+  closeToTray: false,
+  launchAtLogin: false,
+  quickEnabled: false,
+  hotkey: 'CommandOrControl+Shift+X',
+  explorerMenu: false,
+  quickLast: [],
+  watchRules: []
+}
+try {
+  const saved = localStorage.getItem('morphio-mock-settings')
+  if (saved) mockSettings = { ...mockSettings, ...JSON.parse(saved) }
+} catch {
+  /* хранилище недоступно */
+}
+function settingsState(): SettingsState {
+  const language: Language =
+    mockSettings.language === 'system'
+      ? detectLanguage(navigator.language)
+      : mockSettings.language
+  return { settings: mockSettings, language, hotkeyOk: true }
+}
+
+/** Какие файлы подставляет заглушка: ?files=image|video|table|archive|mixed (по умолчанию video). */
+function mockFiles(): FileItem[] {
+  const kind = new URLSearchParams(location.search).get('files') ?? 'video'
+  const mk = (name: string, size: number, k: FileItem['kind'], extra: Partial<FileItem> = {}): FileItem => ({
+    id: crypto.randomUUID(),
+    path: 'C:/Demo/' + name,
+    name,
+    ext: name.split('.').pop() ?? '',
+    size,
+    kind: k,
+    ...extra
+  })
+  if (kind === 'image') {
+    return [mk('IMG_2041.heic', 4_820_000, 'image', { width: 4032, height: 3024 }), mk('holiday-beach.jpg', 3_210_000, 'image', { width: 4000, height: 3000 })]
+  }
+  if (kind === 'table') return [mk('продажи.csv', 48_200, 'table'), mk('склад.xlsx', 91_500, 'table')]
+  if (kind === 'archive') return [mk('backup.zip', 12_400_000, 'archive'), mk('Документы', 0, 'folder')]
+  return [
+    mk('holiday-clip.mov', 184_000_000, 'video', { duration: 94, width: 1920, height: 1080, hasAudio: true }),
+    mk('lecture.mp4', 96_000_000, 'video', { duration: 612, width: 1280, height: 720, hasAudio: true })
+  ]
+}
+
+/** Упрощённая копия реестра форматов: те же варианты и подписи, что в основном процессе. */
+function mockTargets(items: FileItem[]): UniversalTarget[] {
+  const lang = settingsState().language
+  const tr = (x: string): string => translate(lang, x)
+  const per = (item: FileItem, same = true): UniversalTarget[] => {
+    const k = item.kind
+    const out: UniversalTarget[] = []
+    if (k === 'image') IMAGE_FORMATS.filter((f) => same || f.id !== item.ext).forEach((f) => out.push({ id: 'image:' + f.id, label: f.label, group: 'image', hint: tr(f.hint) }))
+    if (k === 'video') VIDEO_TARGETS.filter((f) => same || f.id !== item.ext).forEach((f) => out.push({ id: 'video:' + f.id, label: f.label, group: 'video', hint: tr(f.hint) }))
+    if (k === 'video' || k === 'audio') AUDIO_TARGETS.filter((f) => same || f.id !== item.ext).forEach((f) => out.push({ id: 'audio:' + f.id, label: f.label, group: 'audio', hint: tr(f.hint) }))
+    if (k === 'table') ['xlsx', 'csv', 'tsv', 'json', 'yaml', 'xml'].filter((f) => same || f !== item.ext).forEach((f) => out.push({ id: 'table:' + f, label: f.toUpperCase(), group: 'table', hint: tr('Таблица') }))
+    if (k === 'archive') out.push({ id: 'archive:unpack', label: tr('Распаковать'), group: 'archive', hint: tr('В папку с именем архива') })
+    ;['zip', '7z', 'tar', 'targz'].filter((f) => f !== item.ext).forEach((f) => out.push({ id: 'archive:' + f, label: translate(lang, 'В {fmt}', { fmt: f === 'targz' ? 'TAR.GZ' : f.toUpperCase() }), group: 'archive', hint: tr('Открывается везде, можно с паролем') }))
+    return out
+  }
+  if (items.length === 0) return []
+  const [first, ...rest] = items.map((i) => per(i, true))
+  return first.filter((t) => rest.every((l) => l.some((x) => x.id === t.id)) && items.some((i) => per(i).some((x) => x.id === t.id)))
+}
+
 export function installDevMock(): void {
   const listeners = new Set<(p: JobProgress) => void>()
+  const moduleListeners = new Set<(p: import('@shared/types').ModuleProgress) => void>()
+  let mockPandoc = false
   const dlListeners = new Set<(p: ModelDownloadProgress) => void>()
   const gifListeners = new Set<(p: GifProgress) => void>()
   let modelReady = false
@@ -69,6 +147,36 @@ export function installDevMock(): void {
 
   const api: MorphioApi = {
     getPathForFile: (f) => f.name,
+    watchStatus: async () => [],
+    targetsForKind: async (kind) => [
+      { id: 'image:webp', label: 'WebP', group: 'image' as const, hint: 'Лёгкий' },
+      { id: 'table:xlsx', label: 'XLSX', group: 'table' as const, hint: 'Excel' },
+      { id: 'archive:zip', label: kind + ' ZIP', group: 'archive' as const, hint: 'Архив' }
+    ],
+    onOpenFiles: () => () => {},
+    onQuickFiles: (cb) => {
+      // В браузере быстрое окно показывает демо-файлы через секунду после открытия страницы quick.html.
+      const id = window.setTimeout(() => cb(['demo']), 400)
+      return () => window.clearTimeout(id)
+    },
+    quickClose: async () => {},
+    quickOpenMain: async () => {},
+    quickReady: async () => {},
+    quickRemember: async () => {},
+    takeOpenFiles: async () => [],
+    pickAny: async () => ['demo'],
+    pickAnyFolder: async () => ['demo-folder'],
+    inspectAny: async () => mockFiles(),
+    universalTargets: async (items) => mockTargets(items),
+    universalConvert: async (items) => {
+      for (const item of items) {
+        for (let p = 0; p <= 100; p += 25) {
+          listeners.forEach((l) => l({ id: item.id, status: 'working', percent: p }))
+          await new Promise((r) => setTimeout(r, 120))
+        }
+        listeners.forEach((l) => l({ id: item.id, status: 'done', outputPath: item.path + '-out.' + item.ext, outputSize: Math.round(item.size * 0.8), info: 'строк: 120' }))
+      }
+    },
     pickFiles: async () => ['demo'],
     pickFolder: async () => 'C:\\Converted',
     inspectFiles: async () => [
@@ -76,20 +184,6 @@ export function installDevMock(): void {
       demo('holiday-beach.jpg', 3_210_000, 30),
       demo('logo-final.png', 640_000, 160)
     ],
-    convert: async (items) => {
-      for (const item of items) {
-        listeners.forEach((l) => l({ id: item.id, status: 'working' }))
-        await new Promise((r) => setTimeout(r, 700))
-        listeners.forEach((l) =>
-          l({
-            id: item.id,
-            status: 'done',
-            outputPath: item.path + '.webp',
-            outputSize: Math.round(item.size * 0.34)
-          })
-        )
-      }
-    },
     removeBackground: async (items) => {
       for (const item of items) {
         listeners.forEach((l) => l({ id: item.id, status: 'working' }))
@@ -105,55 +199,7 @@ export function installDevMock(): void {
         )
       }
     },
-    pickMedia: async () => ['demo'],
-    inspectMedia: async () => [
-      {
-        id: crypto.randomUUID(),
-        path: 'C:\\Videos\\holiday-clip.mov',
-        name: 'holiday-clip.mov',
-        ext: 'mov',
-        size: 184_000_000,
-        kind: 'video' as const,
-        duration: 94,
-        width: 1920,
-        height: 1080,
-        hasAudio: true,
-        thumbnail: demo('x', 1, 210).thumbnail
-      },
-      {
-        id: crypto.randomUUID(),
-        path: 'C:\\Music\\song.wav',
-        name: 'song.wav',
-        ext: 'wav',
-        size: 41_000_000,
-        kind: 'audio' as const,
-        duration: 232,
-        hasAudio: true
-      }
-    ],
     mediaCapabilities: async () => ({ gpu: 'nvenc' as const, gpuLabel: 'NVIDIA NVENC' }),
-    convertMedia: async (items) => {
-      for (const item of items) {
-        for (let p = 0; p <= 100; p += 20) {
-          listeners.forEach((l) => l({ id: item.id, status: 'working', percent: p }))
-          await new Promise((r) => setTimeout(r, 150))
-        }
-        const bad = item.kind === 'audio' && Math.random() < 0 // заглушка: ошибок нет
-        listeners.forEach((l) =>
-          l(
-            bad
-              ? { id: item.id, status: 'error', error: 'Из звукового файла нельзя сделать видео' }
-              : {
-                  id: item.id,
-                  status: 'done',
-                  outputPath: item.path + '.out',
-                  outputSize: Math.round(item.size * 0.12),
-                  info: 'H.264 · видеокарта NVIDIA'
-                }
-          )
-        )
-      }
-    },
     pickVideo: async () => 'C:\\Videos\\holiday-clip.mp4',
     videoInfo: async (path) => ({
       path,
@@ -242,11 +288,60 @@ export function installDevMock(): void {
           l({
             id: item.id,
             status: 'done',
-            outputPath: item.path + '.out',
+            outputPath: item.path + '-out.' + item.ext,
             outputSize: Math.round(item.size * 0.2),
             preview: item.thumbnail
           })
         )
+      }
+    },
+    modulesList: async () => [
+      {
+        id: 'pandoc',
+        name: 'Pandoc',
+        version: '3.14',
+        description: 'Документы и книги: DOCX, ODT, RTF, HTML, Markdown, EPUB, FB2 и PDF',
+        license: 'GPL-2.0-or-later',
+        source: 'github.com/jgm/pandoc',
+        sizeMB: 41.6,
+        installed: mockPandoc
+      }
+    ],
+    modulesInstall: async () => {
+      for (let i = 0; i <= 100; i += 20) {
+        moduleListeners.forEach((l) => l({ id: 'pandoc', phase: 'download', received: i * 400000, total: 40_000_000 }))
+        await new Promise((r) => setTimeout(r, 150))
+      }
+      mockPandoc = true
+      moduleListeners.forEach((l) => l({ id: 'pandoc', phase: 'done', received: 1, total: 1 }))
+    },
+    modulesRemove: async () => {
+      mockPandoc = false
+    },
+    calibreFound: async () => false,
+    onModuleProgress: (cb) => {
+      moduleListeners.add(cb)
+      return () => moduleListeners.delete(cb)
+    },
+    compare: async () => {
+      const { image } = demoSprite()
+      const url = image.toDataURL('image/jpeg', 0.9)
+      const lo = document.createElement('canvas')
+      lo.width = Math.round(image.width / 6)
+      lo.height = Math.round(image.height / 6)
+      lo.getContext('2d')!.drawImage(image, 0, 0, lo.width, lo.height)
+      return {
+        before: url,
+        after: lo.toDataURL('image/jpeg', 0.3),
+        width: image.width,
+        height: image.height,
+        originalWidth: image.width,
+        originalHeight: image.height,
+        sizeBefore: 4_200_000,
+        sizeAfter: 900_000,
+        psnr: 31.2,
+        ssim: 0.91,
+        verdict: 'noticeable' as const
       }
     },
     previewImage: async () => {
@@ -291,6 +386,16 @@ export function installDevMock(): void {
     onProgress: (cb) => {
       listeners.add(cb)
       return () => listeners.delete(cb)
+    },
+    getSettings: async () => settingsState(),
+    patchSettings: async (patch) => {
+      mockSettings = { ...mockSettings, ...patch }
+      try {
+        localStorage.setItem('morphio-mock-settings', JSON.stringify(mockSettings))
+      } catch {
+        /* хранилище недоступно */
+      }
+      return settingsState()
     },
     revealInFolder: async () => {}
   }

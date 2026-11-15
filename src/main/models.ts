@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { app } from 'electron'
+import { tm } from './tm'
 import type { ModelDownloadProgress, ModelStatus } from '@shared/types'
 
 /** Модель удаления фона: ISNet (general use), лицензия Apache 2.0. */
@@ -58,7 +59,7 @@ export async function downloadBgModel(
   try {
     await fs.mkdir(dir, { recursive: true })
     const res = await fetch(BG_MODEL.url, { redirect: 'follow' })
-    if (!res.ok || !res.body) throw new Error(`Сервер ответил: ${res.status}`)
+    if (!res.ok || !res.body) throw new Error(tm('Сервер ответил: {status}', { status: res.status }))
     const total = Number(res.headers.get('content-length')) || BG_MODEL.sizeMB * 1024 * 1024
     let received = 0
     let lastReport = 0
@@ -72,7 +73,7 @@ export async function downloadBgModel(
       }
     })
     await pipeline(source, createWriteStream(temp))
-    if (received < BG_MODEL.minBytes) throw new Error('Файл скачался не полностью')
+    if (received < BG_MODEL.minBytes) throw new Error(tm('Файл скачался не полностью'))
     await fs.rename(temp, target)
     report({ received, total, done: true })
   } catch (e) {

@@ -5,6 +5,8 @@ import { useFileJobs } from '../hooks/useFileJobs'
 import FileList from '../components/FileList'
 import DropOverlay from '../components/DropOverlay'
 import { formatBytes } from '../lib'
+import { useI18n } from '../i18n'
+import { Field, Section, Segmented, Switch } from '../components/ui'
 
 type Config = Omit<PipelineConfig, 'outputDir'>
 
@@ -121,6 +123,7 @@ const METHODS: { id: BgMethod; label: string }[] = [
 const SWATCHES = ['#ffffff', '#000000', '#f4f1ea', '#22cc88', '#4f8cff']
 
 export default function PipelineView({ active }: { active: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   const job = useFileJobs(active)
   const { files, progress, running, stats, allDone } = job
 
@@ -178,7 +181,7 @@ export default function PipelineView({ active }: { active: boolean }): React.JSX
 
   const formatInfo = IMAGE_FORMATS.find((f) => f.id === cfg.format)!
   const steps = [
-    cfg.removeBg && 'убрать фон',
+    cfg.removeBg && t('убрать фон'),
     cfg.maxSize && `${cfg.maxSize} px`,
     formatInfo.label
   ].filter(Boolean)
@@ -189,42 +192,46 @@ export default function PipelineView({ active }: { active: boolean }): React.JSX
 
       <header className="list-head">
         <div>
-          <h2>Цепочки</h2>
-          <span className="muted">несколько действий за один проход</span>
+          <h2>{t('Цепочки')}</h2>
+          <span className="muted">{t('несколько действий за один проход')}</span>
         </div>
         <div className="row">
           <button className="btn ghost" onClick={job.pick} disabled={running}>
-            + Добавить файлы
+            {t('+ Добавить файлы')}
           </button>
           {files.length > 0 && (
             <button className="btn ghost" onClick={job.clear} disabled={running}>
-              Очистить
+              {t('Очистить')}
             </button>
           )}
         </div>
       </header>
 
-      {files.length === 0 ? (
-        <div className="empty-state compact">
-          <div className="hero-emoji">⛓️</div>
-          <p>Перетащите изображения сюда. Все они пройдут через выбранную цепочку действий</p>
-          <button className="btn primary" onClick={job.pick}>
-            Выбрать файлы
-          </button>
-        </div>
-      ) : (
-        <FileList
-          files={files}
-          progress={progress}
-          running={running}
-          onRemove={job.remove}
-          previewResult={cfg.removeBg}
-        />
-      )}
+      <div className="cv-scroll">
+        {files.length === 0 ? (
+          <div className="drop-hint">
+            <span className="hero-emoji">⛓️</span>
+            <div>
+              <strong>{t('Перетащите изображения сюда')}</strong>
+              <span className="muted small">{t('Все они пройдут через выбранную цепочку действий')}</span>
+            </div>
+            <button className="btn primary" onClick={job.pick}>
+              {t('Выбрать файлы')}
+            </button>
+          </div>
+        ) : (
+          <FileList
+            files={files}
+            progress={progress}
+            running={running}
+            onRemove={job.remove}
+            previewResult={cfg.removeBg}
+            compact
+            flow
+          />
+        )}
 
-      <section className="settings scroll">
-        <div className="setting">
-          <label>Готовые цепочки</label>
+        <Section title={t('Готовые цепочки')}>
           <div className="chips">
             {[...BUILTIN, ...userPresets].map((p) => (
               <span key={p.id} className="preset">
@@ -233,12 +240,12 @@ export default function PipelineView({ active }: { active: boolean }): React.JSX
                   onClick={() => applyPreset(p)}
                   disabled={running}
                 >
-                  {p.name}
+                  {t(p.name)}
                 </button>
                 {!p.builtin && (
                   <button
                     className="preset-x"
-                    title="Удалить цепочку"
+                    title={t('Удалить цепочку')}
                     onClick={() => deletePreset(p.id)}
                     disabled={running}
                   >
@@ -252,7 +259,7 @@ export default function PipelineView({ active }: { active: boolean }): React.JSX
                 <input
                   autoFocus
                   value={presetName}
-                  placeholder="Название цепочки"
+                  placeholder={t('Название цепочки')}
                   onChange={(e) => setPresetName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') savePreset()
@@ -260,196 +267,194 @@ export default function PipelineView({ active }: { active: boolean }): React.JSX
                   }}
                 />
                 <button className="btn soft" onClick={savePreset} disabled={!presetName.trim()}>
-                  Сохранить
+                  {t('Сохранить')}
                 </button>
               </span>
             ) : (
               <button className="chip dashed" onClick={() => setNaming(true)} disabled={running}>
-                + Сохранить текущую
+                {t('+ Сохранить текущую')}
               </button>
             )}
           </div>
-        </div>
+        </Section>
 
-        <div className="steps">
-          <div className="step">
-            <div className="step-head">
+        <Section title={t('Что сделать с каждым файлом')}>
+          <ol className="pipe-steps">
+            <li className="pipe-step">
               <span className="step-num">1</span>
-              <label className="check">
-                <input
-                  type="checkbox"
+              <div className="pipe-body">
+                <Switch
                   checked={cfg.removeBg}
                   disabled={running}
-                  onChange={(e) => update({ removeBg: e.target.checked })}
+                  onChange={(v) => update({ removeBg: v })}
+                  label={t('Убрать фон')}
                 />
-                <span>Убрать фон</span>
-              </label>
-            </div>
-            {cfg.removeBg && (
-              <>
-                <div className="chips">
-                  {METHODS.map((m) => (
-                    <button
-                      key={m.id}
-                      className={`chip small ${cfg.bgMethod === m.id ? 'active' : ''}`}
-                      onClick={() => update({ bgMethod: m.id })}
-                      disabled={running}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="chips">
-                  <button
-                    className={`chip small ${cfg.fill === 'transparent' ? 'active' : ''}`}
-                    onClick={() => update({ fill: 'transparent' })}
-                    disabled={running}
-                  >
-                    Прозрачный
-                  </button>
-                  <button
-                    className={`chip small ${cfg.fill === 'color' ? 'active' : ''}`}
-                    onClick={() => update({ fill: 'color' })}
-                    disabled={running}
-                  >
-                    Цвет
-                  </button>
-                </div>
-                {cfg.fill === 'color' && (
-                  <div className="swatches">
-                    {SWATCHES.map((c) => (
-                      <button
-                        key={c}
-                        className={`swatch ${cfg.fillColor === c ? 'active' : ''}`}
-                        style={{ background: c }}
-                        onClick={() => update({ fillColor: c })}
+                {cfg.removeBg && (
+                  <div className="options">
+                    <Field label={t('Что за фон на картинке')}>
+                      <Segmented
+                        value={cfg.bgMethod}
                         disabled={running}
-                        aria-label={c}
+                        onChange={(m) => update({ bgMethod: m })}
+                        options={METHODS.map((m) => ({ id: m.id, label: t(m.label) }))}
                       />
-                    ))}
-                    <label className="swatch custom" title="Свой цвет">
-                      <input
-                        type="color"
-                        value={cfg.fillColor}
+                    </Field>
+                    <Field label={t('Фон результата')}>
+                      <Segmented
+                        value={cfg.fill}
                         disabled={running}
-                        onChange={(e) => update({ fillColor: e.target.value })}
+                        onChange={(f) => update({ fill: f })}
+                        options={[
+                          { id: 'transparent', label: t('Прозрачный') },
+                          { id: 'color', label: t('Цвет') }
+                        ]}
                       />
-                    </label>
+                    </Field>
+                    {cfg.fill === 'color' && (
+                      <Field label={t('Цвет')}>
+                        <div className="swatches">
+                          {SWATCHES.map((c) => (
+                            <button
+                              key={c}
+                              className={`swatch ${cfg.fillColor === c ? 'active' : ''}`}
+                              style={{ background: c }}
+                              onClick={() => update({ fillColor: c })}
+                              disabled={running}
+                              aria-label={c}
+                            />
+                          ))}
+                          <label className="swatch custom" title={t('Свой цвет')}>
+                            <input
+                              type="color"
+                              value={cfg.fillColor}
+                              disabled={running}
+                              onChange={(e) => update({ fillColor: e.target.value })}
+                            />
+                          </label>
+                        </div>
+                      </Field>
+                    )}
                   </div>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+            </li>
 
-          <div className="step">
-            <div className="step-head">
+            <li className="pipe-step">
               <span className="step-num">2</span>
-              <strong>Размер</strong>
-            </div>
-            <select
-              value={cfg.maxSize ?? ''}
-              disabled={running}
-              onChange={(e) => update({ maxSize: e.target.value ? Number(e.target.value) : undefined })}
-            >
-              {SIZES.map((o) => (
-                <option key={o.label} value={o.value ?? ''}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="pipe-body">
+                <Field label={t('Размер')}>
+                  <select
+                    value={cfg.maxSize ?? ''}
+                    disabled={running}
+                    onChange={(e) => update({ maxSize: e.target.value ? Number(e.target.value) : undefined })}
+                  >
+                    {SIZES.map((o) => (
+                      <option key={o.label} value={o.value ?? ''}>
+                        {t(o.label)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            </li>
 
-          <div className="step">
-            <div className="step-head">
+            <li className="pipe-step">
               <span className="step-num">3</span>
-              <strong>Формат</strong>
-            </div>
-            <div className="chips">
-              {IMAGE_FORMATS.map((f) => (
-                <button
-                  key={f.id}
-                  className={`chip small ${cfg.format === f.id ? 'active' : ''}`}
-                  onClick={() => update({ format: f.id })}
-                  title={f.hint}
-                  disabled={running}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <label className="mini-range">
-              Качество <b>{formatInfo.hasQuality ? `${cfg.quality}%` : '—'}</b>
-              <input
-                type="range"
-                min={10}
-                max={100}
-                value={cfg.quality}
-                disabled={!formatInfo.hasQuality || running}
-                onChange={(e) => update({ quality: Number(e.target.value) })}
-              />
-            </label>
-          </div>
+              <div className="pipe-body">
+                <div className="options">
+                  <Field label={t('Формат')}>
+                    <Segmented
+                      value={cfg.format}
+                      disabled={running}
+                      onChange={(f) => update({ format: f })}
+                      options={IMAGE_FORMATS.map((f) => ({ id: f.id, label: f.label, hint: t(f.hint) }))}
+                    />
+                  </Field>
+                  {formatInfo.hasQuality && (
+                    <Field label={t('Качество')} hint={`${cfg.quality}%`}>
+                      <input
+                        type="range"
+                        min={10}
+                        max={100}
+                        value={cfg.quality}
+                        disabled={running}
+                        onChange={(e) => update({ quality: Number(e.target.value) })}
+                      />
+                    </Field>
+                  )}
+                </div>
+              </div>
+            </li>
 
-          <div className="step">
-            <div className="step-head">
+            <li className="pipe-step">
               <span className="step-num">4</span>
-              <strong>Файл</strong>
-            </div>
-            <input
-              className="text-input"
-              value={cfg.nameTemplate}
-              disabled={running}
-              onChange={(e) => update({ nameTemplate: e.target.value })}
-              placeholder="{name}"
-              title="Доступно: {name} — имя файла, {n} — номер, {date} — дата, {format} — формат"
-            />
-            <span className="muted small">{'{name} · {n} · {date} · {format}'}</span>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={!cfg.keepMetadata}
-                disabled={running}
-                onChange={(e) => update({ keepMetadata: !e.target.checked })}
-              />
-              <span>Удалить GPS и данные камеры</span>
-            </label>
-            <div className="row tight">
-              <button className="btn soft" onClick={pickFolder} disabled={running}>
-                {outputDir ? 'Другая папка…' : 'Рядом с оригиналом'}
-              </button>
-              {outputDir && (
-                <button className="icon-btn" title="Сбросить" onClick={() => setOutputDir(undefined)}>
-                  <svg viewBox="0 0 24 24" aria-hidden>
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+              <div className="pipe-body">
+                <div className="options">
+                  <Field label={t('Имя файла')} hint={'{name} · {n} · {date} · {format}'}>
+                    <input
+                      className="text-input"
+                      value={cfg.nameTemplate}
+                      disabled={running}
+                      onChange={(e) => update({ nameTemplate: e.target.value })}
+                      placeholder="{name}"
+                      title={t('Доступно: {name} — имя файла, {n} — номер, {date} — дата, {format} — формат')}
+                    />
+                  </Field>
+                  <Field label={t('Конфиденциальность')}>
+                    <Switch
+                      checked={!cfg.keepMetadata}
+                      disabled={running}
+                      onChange={(v) => update({ keepMetadata: !v })}
+                      label={t('Удалить GPS и данные камеры')}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </li>
+          </ol>
+        </Section>
+      </div>
 
-        <footer className="action-bar">
-          <div className="muted">
-            {allDone ? (
-              <>
-                🎉 Готово! Обработано файлов: <b>{stats.done}</b>
-                {stats.before > stats.after && <> · экономия {formatBytes(stats.before - stats.after)}</>}
-              </>
-            ) : (
-              <>Цепочка: {steps.join(' → ')}</>
-            )}
-          </div>
-          {running ? (
-            <button className="btn danger" onClick={() => window.api.cancel()}>
-              Остановить
-            </button>
-          ) : (
-            <button className="btn primary" onClick={start} disabled={allDone || files.length === 0}>
-              {allDone ? 'Готово' : `Запустить${files.length > 1 ? ` (${files.length})` : ''}`}
+      <footer className="action-bar cv-footer">
+        <div className="cv-dest">
+          <button className="btn soft" onClick={pickFolder} disabled={running} title={outputDir}>
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            </svg>
+            {outputDir ? outputDir.split(/[\\/]/).filter(Boolean).pop() : t('Рядом с оригиналом')}
+          </button>
+          {outputDir && (
+            <button className="icon-btn" title={t('Сбросить')} onClick={() => setOutputDir(undefined)}>
+              <svg viewBox="0 0 24 24" aria-hidden>
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
             </button>
           )}
-        </footer>
-      </section>
+          <span className="muted small">
+            {allDone ? (
+              <>
+                🎉 {t('Готово! Обработано файлов:')} <b>{stats.done}</b>
+                {stats.before > stats.after && (
+                  <> · {t('экономия {size}', { size: formatBytes(stats.before - stats.after) })}</>
+                )}
+              </>
+            ) : (
+              <>
+                {t('Цепочка:')} {steps.join(' → ')}
+              </>
+            )}
+          </span>
+        </div>
+        {running ? (
+          <button className="btn danger" onClick={() => window.api.cancel()}>
+            {t('Остановить')}
+          </button>
+        ) : (
+          <button className="btn primary" onClick={start} disabled={allDone || files.length === 0}>
+            {allDone ? t('Готово') : `${t('Запустить')}${files.length > 1 ? ` (${files.length})` : ''}`}
+          </button>
+        )}
+      </footer>
     </div>
   )
 }
