@@ -2,7 +2,7 @@
 
 ## English
 
-### Unreleased
+### 1.0.0 (2026-11-19)
 - Video montage: pieces of one clip, cut out the middle, remove silence, crop frame, transitions, fast rotate
 - Chains for image, video and audio; command line (`morphio convert`, `media`, `gif`, `run` …)
 - GIF studio: text and sticker layers with animations, background removal, GIF/WebP/APNG
@@ -17,7 +17,7 @@
 
 ## Русский
 
-### Не выпущено
+### 1.0.0 (2026-11-19)
 - Монтаж видео: куски одного ролика, вырезание середины, удаление тишины, кадрирование, переходы, быстрый поворот
 - Цепочки для картинок, видео и звука; командная строка (`morphio convert`, `media`, `gif`, `run` …)
 - GIF-студия: слои с текстом и стикерами и их анимации, удаление фона, GIF/WebP/APNG

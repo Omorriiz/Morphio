@@ -1,10 +1,12 @@
 import { execFile } from 'node:child_process'
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import sharp from 'sharp'
 import electronPath from 'electron'
+// версия берётся из package.json: тест не ломается при выпуске новой версии
+const APP_VERSION = (JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as { version: string }).version
 import { copyToWork, exists, expect, hasPandoc, test } from './fixtures'
 
 const ROOT = resolve(__dirname, '../..')
@@ -39,7 +41,7 @@ async function cli(args: string[], opts: { cwd?: string; data?: string } = {}): 
 test.describe('командная строка', () => {
   test('--version, --help, ошибки аргументов дают правильные коды', async () => {
     const v = await cli(['--version'])
-    expect([v.code, v.lines[0]]).toEqual([0, '0.2.0'])
+    expect([v.code, v.lines[0]]).toEqual([0, APP_VERSION])
     const h = await cli(['--help'])
     expect(h.code).toBe(0)
     expect(h.out).toContain('convert')
@@ -229,7 +231,7 @@ test.describe('командная строка', () => {
     expect(doc.code).toBe(0)
     const d = JSON.parse(doc.out)
     expect(d.ffmpeg).toContain('ffmpeg version')
-    expect(d.morphio).toBe('0.2.0')
+    expect(d.morphio).toBe(APP_VERSION)
   })
 
   test('язык сообщений берётся из настроек', async () => {
