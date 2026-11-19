@@ -1,185 +1,111 @@
 # Morphio
 
-Бесплатный конвертер для Windows, который работает **без интернета**: картинки, видео, звук, таблицы, архивы, PDF, документы и книги, удаление фона,
-GIF-студия, монтаж видео, субтитры. Ничего не отправляет в сеть. [English version](README.en.md)
+![Morphio](docs/screenshots/convert.png)
 
-![Конвертер](docs/screenshots/convert.png)
+**English** · [Русский](#русский)
 
-## Скачать и установить
+---
 
-1. Откройте страницу [Releases](https://github.com/Omorriiz/Morphio/releases/latest) и скачайте:
-   - **`Morphio-Setup-<версия>.exe`** — установщик (рекомендуется): права администратора не нужны, появятся ярлыки,
-     программа запускается за пару секунд, работает команда `morphio` в консоли, есть автообновление (включается в Настройках);
-   - или **`Morphio-Portable-<версия>.exe`** — без установки, но каждый запуск медленнее.
-2. Windows может показать «Windows защитила ваш компьютер» (файлы пока не подписаны). Нажмите *Подробнее → Выполнить в любом случае*.
-   Проверить файл можно по `SHA256SUMS.txt` на той же странице.
-3. Запустите Morphio, перетащите файлы в окно, выберите во что превратить и нажмите «Конвертировать». Оригиналы не изменяются.
+## English
 
-**Дополнительные модули** (нейросети, Pandoc) не вшиты в программу: когда функция их требует, рядом появляется кнопка «Скачать». Модуль скачивается один раз
-и дальше работает офлайн. Без них работают конвертация, видео, звук, архивы, GIF и удаление однотонного фона.
+A free file converter for Windows that works **fully offline**. It sends nothing to the network.
 
-**Что-то не работает?** Настройки → «О программе и данные» → «Сообщить о проблеме» (откроется страница обращения с версией и журналом без вашего имени).
+**What it does**
+- Converts images, video, audio, tables, archives, PDF, documents and books (many formats, quality and size limits, batch queue, GPU acceleration)
+- Background removal (solid colour or neural network) with a brush and fill tool
+- GIF studio: GIF, WebP and APNG with text, stickers, crop and speed control
+- Video montage: trim, join, rotate, speed, subtitles, loudness, transitions, silence removal
+- Subtitles (SRT, VTT, ASS), speech to text, text recognition (OCR), photo enlargement
+- Before/after preview, chains of actions, folder watching, quick window (`Ctrl+Shift+X`), Explorer menu
+- Command line: `morphio convert photo.png --to webp`, `morphio gif video.mp4`, `morphio --help`
 
-Системные требования: Windows 10 или 11, 64 бита, около 750 МБ на диске (без модулей). Лицензия: GPL-3.0-or-later.
+### Download and install
 
-<details><summary>Скриншоты</summary>
+1. Open [Releases](https://github.com/Omorriiz/Morphio/releases/latest) and download:
+   - **`Morphio-Setup-<version>.exe`**: the installer (recommended). No administrator rights needed, shortcuts, fast start, the `morphio` command in the console, optional auto-update (off by default; turn it on in Settings).
+   - or **`Morphio-Portable-<version>.exe`**: no installation, but every start is slower.
+2. Windows may show "Windows protected your PC" because the files are not signed yet. Click *More info → Run anyway*. You can check the file against `SHA256SUMS.txt` on the same page.
+3. Start Morphio, drop files into the window, choose the result and press "Convert". Originals are never changed.
 
-![Фон](docs/screenshots/background.png)
+**Extra modules.** Neural networks and Pandoc are not bundled. When a feature needs one, a "Download" button appears next to it. A module is downloaded once and then works offline. Without modules, conversion, video, audio, archives, GIF and solid-colour background removal work.
+
+**Something is wrong?** Settings → "About and data" → "Report a problem". It opens an issue page with the version and a log in which your user name is hidden.
+
+**Requirements:** Windows 10 or 11, 64-bit, about 750 MB of disk space (without modules).
+
+**Privacy:** no telemetry, no uploads. Settings and the log stay in `%APPDATA%\Morphio`. Update checks are off until you turn them on; downloading and installing an update always needs your button press.
+
+### Build from source
+
+Windows, Node.js 22:
+
+```powershell
+npm ci
+npm run dev       # development window
+npm run check     # types, translations, unit tests
+npm run e2e       # tests in a real Electron window
+npm run dist      # installer and portable exe in release/
+```
+
+Release steps: [docs/RELEASE.md](docs/RELEASE.md). Manual test list: [TESTING.md](TESTING.md). Security: [SECURITY.md](SECURITY.md).
+
+### Licence
+
+GPL-3.0-or-later, see [LICENSE](LICENSE). Morphio runs FFmpeg (GPL-3.0) as a separate program; third-party components are listed in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
+
+<details><summary>Screenshots</summary>
+
+![Background](docs/screenshots/background.png)
 ![GIF](docs/screenshots/gif.png)
-![Монтаж](docs/screenshots/montage.png)
+![Montage](docs/screenshots/montage.png)
 
 </details>
 
-## Для разработчиков
+---
 
-### Запуск
+## Русский
 
-```bash
-npm install        # один раз
-npm run dev        # запуск приложения в режиме разработки
-npm run ui         # только интерфейс в браузере (http://localhost:5173), API подменяет заглушка
-npm run typecheck  # проверка типов
-npm run i18n       # у каждой строки интерфейса есть английский перевод
-npm test           # модульные тесты (vitest)
-npm run e2e        # сквозные тесты настоящего окна (Playwright для Electron)
-npm run check      # типы + переводы + модульные тесты
-npm run dist       # сборка приложения (release/)
+Бесплатный конвертер для Windows, который работает **полностью без интернета**. Ничего не отправляет в сеть.
+
+**Что умеет**
+- Конвертирует картинки, видео, звук, таблицы, архивы, PDF, документы и книги (много форматов, лимиты качества и размера, очередь, ускорение на видеокарте)
+- Удаляет фон (однотонный или нейросетью), есть кисть и инструмент «Заливка»
+- GIF-студия: GIF, WebP и APNG с текстом, стикерами, обрезкой и управлением скоростью
+- Монтаж видео: обрезка, склейка, поворот, скорость, субтитры, громкость, переходы, вырезание тишины
+- Субтитры (SRT, VTT, ASS), речь в текст, распознавание текста (OCR), увеличение фото
+- Сравнение «до и после», цепочки действий, следящие папки, быстрое окно (`Ctrl+Shift+X`), меню Проводника
+- Командная строка: `morphio convert photo.png --to webp`, `morphio gif video.mp4`, `morphio --help`
+
+### Скачать и установить
+
+1. Откройте страницу [Releases](https://github.com/Omorriiz/Morphio/releases/latest) и скачайте:
+   - **`Morphio-Setup-<версия>.exe`** — установщик (рекомендуется). Права администратора не нужны, появятся ярлыки, быстрый запуск, команда `morphio` в консоли, автообновление (по умолчанию выключено, включается в Настройках).
+   - или **`Morphio-Portable-<версия>.exe`** — без установки, но каждый запуск медленнее.
+2. Windows может показать «Windows защитила ваш компьютер»: файлы пока не подписаны. Нажмите *Подробнее → Выполнить в любом случае*. Проверить файл можно по `SHA256SUMS.txt` на той же странице.
+3. Запустите Morphio, перетащите файлы в окно, выберите результат и нажмите «Конвертировать». Оригиналы не изменяются.
+
+**Дополнительные модули.** Нейросети и Pandoc не вшиты в программу. Когда функции нужен модуль, рядом появляется кнопка «Скачать». Модуль скачивается один раз и дальше работает офлайн. Без модулей работают конвертация, видео, звук, архивы, GIF и удаление однотонного фона.
+
+**Что-то не работает?** Настройки → «О программе и данные» → «Сообщить о проблеме». Откроется страница обращения с версией и журналом, в котором скрыто ваше имя пользователя.
+
+**Требования:** Windows 10 или 11, 64 бита, около 750 МБ на диске (без модулей).
+
+**Приватность:** без телеметрии и загрузок на сервер. Настройки и журнал лежат в `%APPDATA%\Morphio`. Проверка обновлений выключена, пока вы её не включите; скачивание и установка обновления всегда только по вашей кнопке.
+
+### Сборка из исходников
+
+Windows, Node.js 22:
+
+```powershell
+npm ci
+npm run dev       # окно для разработки
+npm run check     # типы, переводы, модульные тесты
+npm run e2e       # тесты в настоящем окне Electron
+npm run dist      # установщик и портативный exe в release/
 ```
 
-## Тесты
+Как выпускать версии: [docs/RELEASE.md](docs/RELEASE.md). Ручная проверка: [TESTING.md](TESTING.md). Безопасность: [SECURITY.md](SECURITY.md).
 
-- `tests/unit` — 396 модульных тестов: переводы, настройки, реестр форматов, таблицы, архивы
-  (пароли, защита от zip-slip), следящие папки, пункт меню Проводника (временные ключи реестра),
-  картинки, GIF, удаление однотонного фона, видео и звук (настоящий FFmpeg), цепочки.
-- `tests/e2e` — 74 сквозных сценария в окне Electron: разделы, язык, конвертация картинок,
-  видео, таблиц и архивов, фон, настройки, следящая папка, быстрое окно. Каждый тест запускает
-  свою копию приложения с отдельной папкой данных, поэтому работающему Morphio они не мешают.
+### Лицензия
 
-## Готовый exe и пересборка
-
-- `releaseMorphio-Setup-<версия>.exe` — **установщик** (без прав администратора, в `%LOCALAPPDATA%Programs`): ярлыки, быстрый запуск,
-  команда `morphio` в PATH; при удалении спрашивает, убирать ли настройки и модели.
-- `releaseMorphio-Portable-<версия>.exe` (копия в корне проекта: `Morphio.exe`) — портативная версия, ставить ничего не нужно.
-  Каждый запуск распаковывает программу, поэтому он медленнее (это ограничение формата); команда `morphio` из неё не работает.
-- `rebuild.bat` — двойной клик: проверяет типы, собирает установщик и портативную версию и обновляет
-  `Morphio.exe`. Запускайте после любых изменений в коде.
-  Перед пересборкой закройте запущенный Morphio.exe, иначе файл не обновится.
-
-## Настройки, журнал, обращение о проблеме
-
-- Все настройки лежат в `%APPDATA%Morphiosettings.json`: язык, тема, трей, сочетание клавиш, следящие папки, положение окна и значения
-  экранов (формат, качество, папки, свои цепочки, последняя вкладка). Запись атомарная и не чаще раза в полсекунды.
-  Настройки → «О программе и данные»: открыть папку данных, сбросить настройки.
-- Журнал ошибок: `%APPDATA%Morphiologsmorphio-ГГГГ-ММ-ДД.log`, хранится 7 дней или до 5 МБ. Имя пользователя в нём заменяется,
-  содержимое файлов не пишется, в сеть ничего не уходит.
-- «Сообщить о проблеме» (Настройки и экран ошибки) открывает новый Issue на GitHub с версией, Windows, видеокартой и последними строками журнала.
-  Длинный отчёт копируется в буфер обмена.
-- Клик по сообщению об ошибке в карточке файла открывает подробности с кнопкой «Скопировать».
-
-## Лицензия, обновления, подпись
-
-- Лицензия: **GPL-3.0-or-later** (`LICENSE`). Внутри работает FFmpeg (GPL-3.0) как отдельная программа; уведомления: `THIRD_PARTY_NOTICES.txt`.
-- Автообновление (только установленная версия): GitHub Releases через `electron-updater`. Проверка выключена по умолчанию и включается в Настройках;
-  скачивание и установка только по кнопке в баннере «Доступна версия …».
-- Если Windows показывает предупреждение SmartScreen: *Подробнее → Выполнить в любом случае*. Сверьте SHA-256 с `SHA256SUMS.txt` в релизе.
-  Как выпускать версии и подписывать файлы: [docs/RELEASE.md](docs/RELEASE.md).
-
-## Проверка перед релизом
-
-Автоматически: `npm run check` и `npm run e2e` (то же делает GitHub Actions, `.github/workflows/build.yml`).
-Вручную на реальных файлах: [TESTING.md](TESTING.md). Сторонние компоненты: `node scripts/notices.cjs` собирает `THIRD_PARTY_NOTICES.txt`.
-
-## Удаление фона и модель
-
-Нейросеть (`isnet-general-use.onnx`, 179 МБ, Apache 2.0) в exe не вшита. Приложение ищет её в:
-1. `%APPDATA%\Morphio\models` (сюда скачивает кнопка «Скачать» на вкладке «Удалить фон»);
-2. папке `models` рядом с `Morphio.exe`;
-3. папке `models` в корне проекта (режим разработки).
-
-Сейчас файл уже лежит в `models/` рядом с exe. Если переносите exe на другой компьютер,
-скопируйте и папку `models` либо скачайте модель кнопкой в приложении (нужен интернет один раз).
-Вычисления идут на видеокарте через DirectML, при проблемах — на процессоре.
-
-## Структура
-
-```
-src/
-  main/         # процесс Electron: окна, очередь задач, настройки, трей, быстрое окно, слежение
-    converters/ # движки: изображения, видео и звук, GIF, фон, таблицы, архивы
-    registry.ts # реестр форматов: «из чего во что» для всего приложения
-  preload/      # безопасный мост между окном и ядром
-  renderer/     # интерфейс (React): views/ (экраны), components/ (общие элементы)
-  shared/       # общие типы, переводы
-tests/
-  unit/         # модульные тесты (vitest)
-  e2e/          # сквозные тесты окна (Playwright)
-```
-
-## Статус
-
-Интерфейс состоит из четырёх разделов: **Конвертер**, **Фото и фон**, **GIF-студия**, **Настройки**.
-
-- **Конвертер** (`ConvertView.tsx`, `src/main/registry.ts`): картинки, видео, звук, таблицы и архивы в одном окне.
-  Перетащите файлы или папки, приложение покажет только варианты, общие для всех выбранных файлов.
-  Для видео есть быстрый выбор (мессенджер, Discord до 10 МБ, почта до 25 МБ, лучшее качество и др.);
-  настройки показываются только те, что нужны выбранному результату, редкие спрятаны в «Дополнительно».
-  «Тот же формат» тоже предлагается: так можно сжать или уменьшить файл.
-- **Фото и фон**: удаление фона (прозрачный фон или заливка, PNG/WebP/JPG) в режимах «Авто»,
-  «Однотонный фон» (спрайты и иконки на розовом или зелёном фоне, без нейросети, `solidBackground.ts`)
-  и «Нейросеть» (ISNet, фото); пипетка, ручная кисть «стереть / вернуть»; чтение HEIC (фото с iPhone);
-  **цепочки** (фон → размер → формат → имя по шаблону, готовые и свои пресеты).
-- **GIF-студия** (`GifView.tsx`, `converters/gif.ts`): GIF и анимированный WebP из картинок, папки с кадрами
-  или видео (FFmpeg 6.1.1 из `ffmpeg-static`, GPL-3.0); лента кадров с задержками, проигрыватель,
-  порядок (обычный, обратный, туда-обратно), лимит размера (например, для Discord), кадры в PNG.
-- **Видео и звук** (`converters/media.ts`): MP4 (H.264), WebM (VP9), MKV; MP3, M4A, WAV, FLAC, OGG, OPUS;
-  звук из видео; ускорение на видеокарте (NVENC, AMF, Quick Sync, проверяется при запуске);
-  лимит размера файла с подбором битрейта; «720p» считается по короткой стороне.
-- **Таблицы** (`converters/tables.ts`): CSV, TSV, XLSX, JSON, XML, YAML в любых сочетаниях; кодировка
-  (в том числе Windows-1251), разделитель и десятичная запятая определяются сами; книга с несколькими
-  листами разбирается по листам.
-- **Архивы** (`converters/archives.ts`, `7za.exe` из `7zip-bin`): ZIP, 7z, TAR, TAR.GZ — запаковать файл
-  или папку (уровень сжатия, пароль), распаковать, перепаковать; защита от `../` в путях и «архивных
-  бомб». RAR не поддерживается, пароль ZIP только латиницей (для русского есть 7z).
-- **PDF** (`converters/pdf.ts`, pdf-lib, pdfjs-dist): PDF в текст и страницы-картинки, разделить, склеить из PDF и картинок,
-  картинка в PDF.
-- **Документы и книги** (`converters/documents.ts`, модуль Pandoc): DOCX, ODT, RTF, HTML, Markdown, TXT, EPUB, FB2 и PDF;
-  MOBI и AZW3 через Calibre, если он установлен. Pandoc (43,6 МБ) скачивается по кнопке с проверкой SHA-256
-  (`modules.ts`), в установщик не входит. Для тестов с настоящим Pandoc распакуйте его в `modules/pandoc/3.14`.
-- **Монтаж** (`MontageView.tsx`, `converters/montage.ts`): обрезка, склейка, поворот и отражение, скорость, субтитры
-  (дорожкой или в картинку), нормализация громкости; всё за один запуск FFmpeg, быстрый режим без перекодирования.
-  Куски одного ролика (разрезать, вырезать середину, убрать тишину), кадрирование рамкой, плавные переходы,
-  поворот меткой без перекодирования.
-- **Субтитры** (`converters/subtitles.ts`, `shared/subtitles.ts`, `SubtitleEditor.tsx`): SRT, VTT, ASS и текст друг в друга
-  со сдвигом времени, дорожка субтитров из видео, простой редактор текста и времени.
-- **Нейросети** (`modules.ts`, `converters/upscale.ts`, `ocr.ts`, `speech.ts`): увеличение фото (Real-ESRGAN), распознавание текста (Tesseract), речь в
-  субтитры (Whisper). Модели докачиваются по кнопке из релиза `models-v1`; файлы для релиза лежат в `models-release`,
-  публикует их `scripts/publish-models.ps1`.
-- **Командная строка** (`cli.ts`, `cli-node.ts`, `morphio.cmd`): `morphio convert photo.heic --to jpg`, `morphio media`, `morphio run shop *.jpg`,
-  `morphio gif`, `morphio doctor`, `morphio --help`; `--overwrite`, `--shift`. Лёгкий режим Node без окон, чистый stdout, коды возврата 0/1/2/3. Работает у установленной
-  копии (папка с `Morphio.exe` и `resources`); из исходников: `npm run build && npm run cli -- --help`.
-- **GIF-студия+** (`converters/gif.ts`, `gifLayers.ts`): текст с обводкой и стикеры, которые двигают мышью, рамка обрезки,
-  удаление фона у всех кадров (однотонный или нейросеть со сглаживанием по времени), форматы GIF, WebP и APNG; анимация слоёв (появление, мигание, бегущая строка), скорость части кадров.
-- **Цепочки** (`chains.ts`, `shared/chains.ts`): три ветки (картинки, видео, звук); видео: срез краёв, поворот, 9:16 и др.,
-  лимит размера, громкость; звук: тишина, громкость, формат, запись тегов; видео: субтитры из файла рядом. Старые сохранённые цепочки мигрируют автоматически.
-- **Заливка в редакторе маски** (`shared/regionFill.ts`, `MaskEditor.tsx`): клик убирает область цвета (Lab), смежную или по всей картинке,
-  цвет под курсором или пипеткой, подсветка при наведении, общая история с кистью.
-- **До и после** (`compare.ts`): слайдер с приближением, размеры, оценка потери качества (SSIM, PSNR).
-- **Русский и английский** (`src/shared/i18n.ts`, `src/shared/en.ts`): язык по умолчанию берётся из
-  Windows, переключатель RU / EN внизу боковой панели, выбор хранится в `settings.json`
-  (`%APPDATA%\Morphio`).
-- **Фоновый режим** (раздел «Настройки», всё выключено, пока вы не включите): значок в трее,
-  «закрытие окна сворачивает в трей», запуск вместе с Windows; **быстрое окно** по сочетанию клавиш
-  (по умолчанию `Ctrl+Shift+X`: берёт выделение из Проводника, скопированные файлы или скриншот из буфера);
-  пункт «Конвертировать в Morphio» в меню Проводника (классическое меню, реестр HKCU, без прав
-  администратора; `Morphio.exe --quick файл…` открывает только быстрое окно); **следящие папки**
-  (новый файл конвертируется по правилу в подпапку `Morphio-out`, итог показывается уведомлением Windows);
-  один экземпляр приложения.
-
-## Логотип и иконка
-
-Исходники логотипа лежат в `build/` (`logo-icon.webp`, `logo-wordmark.webp`).
-`npm run icons` пересоздаёт `build/icon.ico` (в больших размерах полный логотип, в маленьких
-крупный план знака «M») и ассеты интерфейса.
-
-Для просмотра интерфейса в обычном браузере (`http://localhost:5173` при `npm run dev`)
-используется заглушка API из `src/renderer/src/devMock.ts`.
+GPL-3.0-or-later, см. [LICENSE](LICENSE). Morphio запускает FFmpeg (GPL-3.0) как отдельную программу; сторонние компоненты перечислены в [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
