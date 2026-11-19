@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import sharp from 'sharp'
 import electronPath from 'electron'
-import { copyToWork, exists, expect, test } from './fixtures'
+import { copyToWork, exists, expect, hasPandoc, test } from './fixtures'
 
 const ROOT = resolve(__dirname, '../..')
 
@@ -138,6 +138,7 @@ test.describe('командная строка', () => {
   })
 
   test('документ → PDF: лёгкая команда передаёт печать приложению с Chromium (нужен Pandoc в modules)', async () => {
+    test.skip(!hasPandoc, 'нет Pandoc в папке modules')
     const dir = join(tmpdir(), `morphio-cli-doc-${randomUUID().slice(0, 8)}`)
     await fs.mkdir(dir, { recursive: true })
     const md = join(dir, 'заметка.md')

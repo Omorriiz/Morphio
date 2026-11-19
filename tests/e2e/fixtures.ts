@@ -1,7 +1,7 @@
 import { _electron as electron, expect, test as base } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -135,6 +135,9 @@ export async function copyToWork(src: string, name?: string): Promise<{ dir: str
   await fs.copyFile(src, path)
   return { dir, path }
 }
+
+/** Pandoc лежит в modules (в разработке да, на чистой машине CI нет): тесты документов без него пропускаются. */
+export const hasPandoc = existsSync(join(ROOT, 'modules', 'pandoc', '3.14', '.ok'))
 
 export const exists = (p: string): Promise<boolean> => fs.stat(p).then(() => true, () => false)
 

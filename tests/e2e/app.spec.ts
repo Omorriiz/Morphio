@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import ffmpegPath from 'ffmpeg-static'
 import { join } from 'node:path'
-import { copyToWork, exists, expect, test } from './fixtures'
+import { copyToWork, exists, expect, hasPandoc, test } from './fixtures'
 
 const primary = '.action-bar .btn.primary:visible'
 const card = (label: string): string => `.format-card:has(b:text-is("${label}"))`
@@ -393,6 +393,7 @@ test.describe('PDF', () => {
 
 test.describe('документы', () => {
   test('Markdown → PDF через Chromium и → EPUB (нужен модуль Pandoc в папке modules)', async ({ launch, assets }) => {
+    test.skip(!hasPandoc, 'нет Pandoc в папке modules')
     const work = await copyToWork(assets.csv)
     const md = join(work.dir, 'заметка.md')
     await fs.writeFile(md, '# Заголовок\n\nПривет, мир!\n\n| a | b |\n|---|---|\n| 1 | 2 |\n', 'utf8')
