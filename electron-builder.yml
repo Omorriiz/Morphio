@@ -66,6 +66,8 @@ nsis:
   include: build/installer.nsh
 portable:
   artifactName: Morphio-Portable-${version}.${ext}
+# Публикацию делает release.yml; electron-builder только собирает (npm run dist = --publish never).
+# Секция нужна автообновлению: из неё приложение узнаёт, где искать релизы.
 publish:
   provider: github
   owner: Omorriiz
