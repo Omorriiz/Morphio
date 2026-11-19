@@ -47,16 +47,22 @@ Write-Host ("Будет создан релиз {0} в {1} и загружено
 $answer = Read-Host 'Опубликовать? Введите yes'
 if ($answer -ne 'yes') { Write-Host 'Отменено.'; exit 1 }
 
+# Windows PowerShell 5.1 считает любой текст из stderr программы ошибкой: на время вызовов gh отключаем остановку,
+# а результат проверяем по коду возврата.
+$ErrorActionPreference = 'Continue'
 $exists = $true
-gh release view $tag --repo $repo 2>$null | Out-Null
+gh release view $tag --repo $repo 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { $exists = $false }
 if (-not $exists) {
+  Write-Host "Создаю релиз $tag..."
   gh release create $tag --repo $repo --title 'Модели и программы для модулей Morphio' --notes-file (Join-Path $dir 'NOTICE.md')
+  if ($LASTEXITCODE -ne 0) { throw 'Не удалось создать релиз' }
 }
 
 $files = @($expected.Keys | ForEach-Object { Join-Path $dir $_ }) + (Join-Path $dir 'SHA256SUMS.txt') + (Join-Path $dir 'NOTICE.md')
 foreach ($f in $files) {
   Write-Host "Загружаю $(Split-Path $f -Leaf)..."
   gh release upload $tag $f --repo $repo --clobber
+  if ($LASTEXITCODE -ne 0) { throw "Не удалось загрузить $(Split-Path $f -Leaf). Запустите скрипт ещё раз (файлы перезальются)." }
 }
 Write-Host 'Готово. Адрес: https://github.com/Omorriiz/Morphio/releases/tag/models-v1'
