@@ -65,7 +65,7 @@ describe('модули по требованию', () => {
     const root = await tmpDir('mods')
     configureModules([root])
     const { list, report } = collect()
-    await installModule('pandoc', report, undefined, { url: `${url}/ok.zip`, sha256: sha, size: zipBytes.length })
+    await installModule('pandoc', report, undefined, { files: [{ name: 'pandoc.zip', url: `${url}/ok.zip`, sha256: sha, size: zipBytes.length, unzip: true }] })
     expect(list.at(-1)?.phase).toBe('done')
     expect(moduleReady('pandoc')).toBe(true)
     expect(modulePath('pandoc')?.endsWith('pandoc.exe')).toBe(true)
@@ -79,7 +79,7 @@ describe('модули по требованию', () => {
     const root = await tmpDir('mods')
     configureModules([root])
     const { list, report } = collect()
-    await installModule('pandoc', report, undefined, { url: `${url}/tampered.zip`, sha256: sha, size: zipBytes.length })
+    await installModule('pandoc', report, undefined, { files: [{ name: 'pandoc.zip', url: `${url}/tampered.zip`, sha256: sha, size: zipBytes.length, unzip: true }] })
     const last = list.at(-1)!
     expect(last.phase).toBe('error')
     expect(last.error).toBeTruthy()
@@ -91,7 +91,7 @@ describe('модули по требованию', () => {
     const root = await tmpDir('mods')
     configureModules([root])
     const { list, report } = collect()
-    await installModule('pandoc', report, undefined, { url: `${url}/missing.zip`, sha256: sha, size: 1 })
+    await installModule('pandoc', report, undefined, { files: [{ name: 'pandoc.zip', url: `${url}/missing.zip`, sha256: sha, size: 1, unzip: true }] })
     expect(list.at(-1)?.phase).toBe('error')
   })
 
@@ -104,5 +104,106 @@ describe('модули по требованию', () => {
     expect(moduleReady('pandoc')).toBe(false) // без метки .ok модуль не считается готовым
     await fs.writeFile(join(b, 'pandoc', '3.14', '.ok'), 'x')
     expect(moduleReady('pandoc')).toBe(true)
+  })
+})
+
+// ---- модули с моделями: копии в релизе проекта ----
+import { createReadStream, existsSync } from 'node:fs'
+import { MODULES } from '../../src/main/modules'
+
+const RELEASE = join(process.cwd(), 'models-release')
+
+describe('манифест модулей', () => {
+  it('у каждого модуля есть файлы, главный файл, лицензия, источник; идентификаторы не повторяются', () => {
+    expect(new Set(MODULES.map((m) => m.id)).size).toBe(MODULES.length)
+    for (const m of MODULES) {
+      expect(m.files.length).toBeGreaterThan(0)
+      expect(m.license).toBeTruthy()
+      expect(m.source).toBeTruthy()
+      for (const f of m.files) {
+        expect(f.sha256).toMatch(/^[0-9a-f]{64}$/)
+        expect(f.size).toBeGreaterThan(0)
+      }
+      // главный файл — либо сохранённый файл, либо лежит внутри распакованного архива
+      const saved = m.files.map((f) => f.saveAs ?? f.name)
+      expect(saved.includes(m.main) || m.files.some((f) => f.unzip)).toBe(true)
+    }
+    // собственные модели берутся из релиза проекта (нет своего адреса), чужие программы — с официальных страниц
+    for (const m of MODULES.filter((x) => x.group === 'model')) expect(m.files.every((f) => !f.url)).toBe(true)
+  })
+
+  it('нейросеть ищет рядом файл model.data: он сохраняется под этим именем', () => {
+    const up = MODULES.find((m) => m.id === 'upscale')!
+    expect(up.files.map((f) => f.saveAs)).toEqual(['model.onnx', 'model.data'])
+  })
+
+  it('все группы заданы, у моделей Whisper три размера', () => {
+    expect(MODULES.filter((m) => m.id.startsWith('whisper-')).map((m) => m.id)).toEqual(['whisper-tiny', 'whisper-base', 'whisper-small'])
+  })
+})
+
+describe.skipIf(!existsSync(RELEASE))('установка моделей из папки релиза (настоящие файлы через локальный сервер)', () => {
+  let srv: Server
+  let base: string
+
+  beforeAll(async () => {
+    srv = createServer((req, res) => {
+      const name = decodeURIComponent((req.url ?? '').slice(1))
+      const file = join(RELEASE, name)
+      if (!existsSync(file) || name.includes('..')) {
+        res.writeHead(404)
+        res.end()
+        return
+      }
+      fs.stat(file).then((st) => {
+        res.writeHead(200, { 'content-length': st.size })
+        createReadStream(file).pipe(res)
+      })
+    })
+    await new Promise<void>((resolve) => srv.listen(0, '127.0.0.1', resolve))
+    base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`
+    process.env['MORPHIO_MODELS_URL'] = base
+  })
+
+  afterAll(async () => {
+    delete process.env['MORPHIO_MODELS_URL']
+    await new Promise<void>((resolve) => srv.close(() => resolve()))
+  })
+
+  it('upscale: два файла, имена model.onnx и model.data, контрольные суммы сходятся', async () => {
+    const root = await tmpDir('mods')
+    configureModules([root])
+    const { list, report } = collect()
+    await installModule('upscale', report)
+    expect(list.at(-1)?.phase).toBe('done')
+    expect(modulePath('upscale')?.endsWith('model.onnx')).toBe(true)
+    expect(await exists(join(root, 'upscale', 'x4v3', 'model.data'))).toBe(true)
+    expect(list.some((p) => p.phase === 'download' && p.total === 42_443 + 4_836_096)).toBe(true)
+  })
+
+  it('языки Tesseract и программа whisper.cpp (с распаковкой)', async () => {
+    const root = await tmpDir('mods')
+    configureModules([root])
+    for (const id of ['tess-rus', 'tess-eng', 'whisper']) {
+      const { list, report } = collect()
+      await installModule(id, report)
+      expect(list.at(-1)?.phase, id).toBe('done')
+      expect(moduleReady(id)).toBe(true)
+    }
+    expect(modulePath('whisper')?.endsWith('whisper-cli.exe')).toBe(true)
+    expect(moduleList().filter((m) => m.installed).map((m) => m.id).sort()).toEqual(['tess-eng', 'tess-rus', 'whisper'])
+    await removeModule('whisper')
+    expect(moduleReady('whisper')).toBe(false)
+  })
+
+  it('подменённый файл на сервере отвергается', async () => {
+    const root = await tmpDir('mods')
+    configureModules([root])
+    const { list, report } = collect()
+    process.env['MORPHIO_MODELS_URL'] = `${base}/нет-такой-папки`
+    await installModule('tess-eng', report)
+    process.env['MORPHIO_MODELS_URL'] = base
+    expect(list.at(-1)?.phase).toBe('error')
+    expect(moduleReady('tess-eng')).toBe(false)
   })
 })

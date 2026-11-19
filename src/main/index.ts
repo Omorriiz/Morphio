@@ -1,5 +1,6 @@
+import { appendFileSync, writeSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
-import { basename, extname, join } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron'
 import { INPUT_IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from '@shared/types'
@@ -7,13 +8,17 @@ import type {
   AppSettings,
   BgOutputFormat,
   BgRemoveOptions,
-  BrushStroke,
+  EditOp,
   FileItem,
   FileKind,
   GifBuildOptions,
   GifFrame,
   ImagePreview,
   JobProgress,
+  MontageClip,
+  MontagePlan,
+  GifCrop,
+  GifLayer,
   MaskEditSession,
   ModelDownloadProgress,
   PipelineConfig,
@@ -38,15 +43,26 @@ import {
   videoInfo,
   videoPoster
 } from './ffmpeg'
-import { bgModelStatus, downloadBgModel, findBgModel } from './models'
+import { bgModelStatus, configureModelDirs, downloadBgModel, findBgModel } from './models'
 import { openImage } from './imageInput'
 import { comparePair } from './compare'
+import { loadCues, saveCues } from './converters/subtitles'
+import { SUBTITLE_EXTENSIONS } from '@shared/subtitles'
+import type { Cue } from '@shared/subtitles'
+import { cliArgs, cliRequested, runCli } from './cli'
+import { resolveLanguage } from '@shared/i18n'
+import { setMainLanguage } from './tm'
+import { filmstrip, detectSilence, inspectClips, runMontage } from './converters/montage'
 import { calibreBinary, cancelDocuments } from './converters/documents'
+import { cancelOcr } from './converters/ocr'
+import { cancelSpeech } from './converters/speech'
+import { cancelUpscale } from './converters/upscale'
 import { configureModules, installModule, moduleList, removeModule } from './modules'
-import { applyStrokes } from './maskEdit'
-import { runPipelineItem } from './pipeline'
+import { applyEdits } from './maskEdit'
+import { runChainItem } from './chains'
+import type { ChainConfig } from '@shared/chains'
 import { JobQueue } from './queue'
-import { describeItem, getTargets, MERGE_TARGET, runMerge, runUniversal, targetsForKind } from './registry'
+import { describeItem, getTargets, kindOfExt, MERGE_TARGET, runMerge, runUniversal, targetsForKind } from './registry'
 import { cancelArchives } from './converters/archives'
 import { flushSettings, getSettings, loadSettings, patchSettings, settingsState } from './settings'
 import { tm } from './tm'
@@ -267,23 +283,39 @@ function registerIpc(): void {
   )
 
   ipcMain.handle('gif:build', (e, frames: GifFrame[], options: GifBuildOptions) =>
-    buildGif(frames, options, (p) => e.sender.send('gif:progress', p))
+    buildGif(frames, options, (p) => e.sender.send('gif:progress', p), { modelPath: findBgModel() })
   )
 
-  ipcMain.handle('gif:export', (e, frames: GifFrame[], outputDir: string) =>
-    exportFrames(frames, outputDir, (p) => e.sender.send('gif:progress', p))
+  // Картинка для стикера: уменьшается до maxSide, прозрачность сохраняется
+  ipcMain.handle('gif:sticker', async (_e, path: string, maxSide: number): Promise<ImagePreview> => {
+    const img = (await openImage(path)).rotate().resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true })
+    const { data, info } = await img.png().toBuffer({ resolveWithObject: true })
+    return { dataUrl: `data:image/png;base64,${data.toString('base64')}`, width: info.width, height: info.height }
+  })
+
+  ipcMain.handle('gif:export', (e, frames: GifFrame[], outputDir: string, extra?: { crop?: GifCrop; layers?: GifLayer[] }) =>
+    exportFrames(frames, outputDir, (p) => e.sender.send('gif:progress', p), extra)
   )
 
-  ipcMain.handle('pipeline:start', async (e, items: FileItem[], config: PipelineConfig) => {
+  ipcMain.handle('chain:start', async (e, items: FileItem[], config: ChainConfig) => {
+    const caps = await detectGpu()
     const modelPath = findBgModel()
-    const q = new JobQueue(config.removeBg ? 1 : 3)
+    // нейросеть и видео тяжёлые: по одному файлу за раз
+    const heavy = config.image.removeBg || items.some((it) => (it.kind ?? kindOfExt(it.ext)) === 'video')
+    const q = new JobQueue(heavy ? 1 : 3)
     pipelineQueue = q
-    const index = new Map(items.map((it, i) => [it.id, i]))
-    await q.run(
-      items,
-      (item) => runPipelineItem(item, index.get(item.id) ?? 0, config, modelPath),
-      (progress: JobProgress) => e.sender.send('convert:progress', progress)
-    )
+    const index = new Map(items.map((it, n) => [it.id, n]))
+    universalJobs++
+    try {
+      await q.run(
+        items,
+        (item, update) => runChainItem(item, index.get(item.id) ?? 0, config, { gpu: caps.gpu, modelPath }, update),
+        (progress: JobProgress) => e.sender.send('convert:progress', progress)
+      )
+    } finally {
+      universalJobs--
+      maybeQuitIdle()
+    }
   })
 
   ipcMain.handle('any:pick', async () => {
@@ -350,8 +382,17 @@ function registerIpc(): void {
     cancelFfmpeg()
     cancelArchives()
     cancelDocuments()
+    cancelOcr()
+    cancelSpeech()
+    cancelUpscale()
   })
 
+  ipcMain.handle('subs:load', (_e, path: string) => loadCues(path))
+  ipcMain.handle('subs:save', async (_e, path: string, cues: Cue[]) => {
+    // только файлы субтитров: редактор не должен переписывать что попало
+    if (!SUBTITLE_EXTENSIONS.includes(extname(path).slice(1).toLowerCase())) throw new Error(tm('Это не файл субтитров'))
+    await saveCues(path, cues)
+  })
   ipcMain.handle('compare:pair', (_e, inputPath: string, outputPath: string, time?: number) =>
     comparePair(inputPath, outputPath, time)
   )
@@ -410,15 +451,16 @@ function registerIpc(): void {
       _e,
       item: FileItem,
       options: BgRemoveOptions,
-      strokes: BrushStroke[],
+      strokes: EditOp[],
       outputPath: string
     ): Promise<SavedResult> => {
       const cutout = await getCutout(item, options)
       const mask = Buffer.from(cutout.mask)
-      applyStrokes(mask, cutout.width, cutout.height, strokes)
+      const colors = Buffer.from(cutout.colors)
+      applyEdits(colors, mask, cutout.width, cutout.height, strokes)
       const ext = extname(outputPath).slice(1).toLowerCase()
       const format = (ext === 'jpg' || ext === 'webp' ? ext : 'png') as BgOutputFormat
-      const edited = { ...cutout, mask, note: `${cutout.note}, ${tm('правка кистью')}` }
+      const edited = { ...cutout, colors, mask, note: `${cutout.note}, ${tm('правка кистью')}` }
       return writeCutout(item, edited, { ...options, format }, outputPath)
     }
   )
@@ -427,6 +469,47 @@ function registerIpc(): void {
 
   ipcMain.handle('model:download', async (e) => {
     await downloadBgModel((p: ModelDownloadProgress) => e.sender.send('model:progress', p))
+  })
+
+  ipcMain.handle('montage:pick-videos', async () => {
+    if (!mainWindow) return []
+    const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: tm('Выберите видео'),
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: tm('Видео'), extensions: VIDEO_EXTENSIONS },
+        { name: tm('Все файлы'), extensions: ['*'] }
+      ]
+    })
+    return filePaths
+  })
+
+  ipcMain.handle('montage:pick-subs', async () => {
+    if (!mainWindow) return undefined
+    const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: tm('Выберите файл субтитров'),
+      properties: ['openFile'],
+      filters: [
+        { name: tm('Субтитры'), extensions: ['srt', 'vtt', 'ass', 'ssa'] },
+        { name: tm('Все файлы'), extensions: ['*'] }
+      ]
+    })
+    return filePaths[0]
+  })
+
+  ipcMain.handle('montage:inspect', (_e, paths: string[]): Promise<MontageClip[]> => inspectClips(paths))
+  ipcMain.handle('montage:silence', (_e, path: string, noiseDb: number, minSilence: number) => detectSilence(path, noiseDb, minSilence))
+  ipcMain.handle('montage:strip', (_e, path: string, count: number, height: number) => filmstrip(path, count, height))
+
+  ipcMain.handle('montage:run', async (e, plan: MontagePlan) => {
+    const caps = await detectGpu()
+    universalJobs++
+    try {
+      return await runMontage(plan, caps.gpu, (percent, text) => e.sender.send('montage:progress', { percent, text }))
+    } finally {
+      universalJobs--
+      maybeQuitIdle()
+    }
   })
 
   ipcMain.handle('modules:list', () => moduleList())
@@ -439,9 +522,65 @@ function registerIpc(): void {
   ipcMain.handle('shell:reveal', (_e, path: string) => shell.showItemInFolder(path))
 }
 
+// Режим командной строки: `Morphio.exe --cli ...`. Окон нет, результат уходит в stdout/stderr, код выхода — код завершения.
+const CLI_MODE = cliRequested(process.argv)
+
+/** Папки моделей: данные приложения, рядом с портативным exe, корень проекта (разработка). */
+function modelDirs(): string[] {
+  return [
+    join(app.getPath('userData'), 'models'),
+    ...(process.env['PORTABLE_EXECUTABLE_DIR'] ? [join(process.env['PORTABLE_EXECUTABLE_DIR'], 'models')] : []),
+    join(dirname(process.execPath), 'models'),
+    join(app.getAppPath(), 'models')
+  ]
+}
+
+async function runCliMode(): Promise<void> {
+  // Скрытое окно печати PDF закрывается раньше конца работы: без этого Electron завершил бы процесс сам
+  app.on('window-all-closed', () => {})
+  const args = cliArgs(process.argv)
+  if (args.includes('--no-settings')) setMainLanguage(resolveLanguage('system', app.getLocale()))
+  else await loadSettings()
+  configureModules([
+    join(app.getPath('userData'), 'modules'),
+    ...(process.env['PORTABLE_EXECUTABLE_DIR'] ? [join(process.env['PORTABLE_EXECUTABLE_DIR'], 'modules')] : []),
+    join(dirname(process.execPath), 'modules'),
+    join(app.getAppPath(), 'modules')
+  ])
+  configureModelDirs(modelDirs())
+  // После создания окна Chromium (печать PDF) стандартный вывод теряется. Поэтому лёгкая командная строка,
+  // которая передаёт нам работу, просит писать результат в файл (MORPHIO_CLI_OUT) и сама печатает его.
+  const outFile = process.env['MORPHIO_CLI_OUT']
+  const write = (fd: number, text: string): void => {
+    try {
+      if (fd === 1 && outFile) appendFileSync(outFile, text + '\n')
+      else writeSync(fd, text + '\n')
+    } catch {
+      /* канал закрыт */
+    }
+  }
+  const code = await runCli(args, {
+    version: app.getVersion(),
+    info: {
+      electron: process.versions.electron ?? '',
+      node: process.versions.node,
+      chromium: process.versions.chrome ?? '',
+      platform: `${process.platform} ${process.arch}`
+    },
+    dataDir: app.getPath('userData'),
+    io: { out: (t) => write(1, t), err: (t) => write(2, t) },
+    bgModel: findBgModel,
+    electron: true,
+    args
+  })
+  app.exit(code)
+}
+
 // Один экземпляр: горячая клавиша и трей принадлежат запущенной копии, повторный запуск (например,
 // из меню Проводника) просто передаёт ей файлы.
-if (!app.requestSingleInstanceLock()) {
+if (CLI_MODE) {
+  /* командная строка работает параллельно с окном и не занимает блокировку */
+} else if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', (_e, argv) => {
@@ -453,14 +592,17 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.whenReady().then(async () => {
+  if (CLI_MODE) return runCliMode()
   void cleanupFrameDirs() // остатки кадров от прошлого запуска
   await loadSettings()
   // Модули (Pandoc): ставятся в папку данных; рядом с портативным exe и в корне проекта (разработка) тоже ищем
   configureModules([
     join(app.getPath('userData'), 'modules'),
     ...(process.env['PORTABLE_EXECUTABLE_DIR'] ? [join(process.env['PORTABLE_EXECUTABLE_DIR'], 'modules')] : []),
+    join(dirname(process.execPath), 'modules'),
     join(app.getAppPath(), 'modules')
   ])
+  configureModelDirs(modelDirs())
   registerIpc()
   initBackground({
     getMain: () => mainWindow,

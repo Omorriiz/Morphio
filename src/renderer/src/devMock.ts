@@ -127,6 +127,7 @@ export function installDevMock(): void {
   const listeners = new Set<(p: JobProgress) => void>()
   const moduleListeners = new Set<(p: import('@shared/types').ModuleProgress) => void>()
   let mockPandoc = false
+  const montageListeners = new Set<(p: import('@shared/types').MontageProgress) => void>()
   const dlListeners = new Set<(p: ModelDownloadProgress) => void>()
   const gifListeners = new Set<(p: GifProgress) => void>()
   let modelReady = false
@@ -280,7 +281,7 @@ export function installDevMock(): void {
       gifListeners.add(cb)
       return () => gifListeners.delete(cb)
     },
-    runPipeline: async (items) => {
+    runChain: async (items) => {
       for (const item of items) {
         listeners.forEach((l) => l({ id: item.id, status: 'working' }))
         await new Promise((r) => setTimeout(r, 500))
@@ -295,9 +296,52 @@ export function installDevMock(): void {
         )
       }
     },
+    montagePickVideos: async () => ['demo-1.mp4', 'demo-2.mp4'],
+    montagePickSubtitles: async () => 'demo.srt',
+    montageInspect: async (paths) =>
+      paths.map((p, n) => ({
+        id: 'clip-' + n + '-' + p,
+        path: p,
+        name: p.split(/[\\/]/).pop() ?? p,
+        duration: 42 + n * 17,
+        width: 1920,
+        height: 1080,
+        fps: 30,
+        hasAudio: true,
+        audioTracks: 1,
+        vcodec: 'h264',
+        acodec: 'aac',
+        audioRate: 48000
+      })),
+    montageSilence: async () => [],
+    subtitlesLoad: async () => [{ start: 1, end: 3, text: 'Привет, мир' }],
+    subtitlesSave: async () => undefined,
+    montageStrip: async () => {
+      const c = document.createElement('canvas')
+      c.width = 800
+      c.height = 48
+      const g = c.getContext('2d')!
+      for (let k = 0; k < 10; k++) {
+        g.fillStyle = 'hsl(' + (k * 28) + ',70%,60%)'
+        g.fillRect(k * 80, 0, 80, 48)
+      }
+      return c.toDataURL('image/jpeg', 0.8)
+    },
+    montageRun: async () => {
+      for (let p = 0; p <= 100; p += 20) {
+        montageListeners.forEach((l) => l({ percent: p, text: 'Сохраняю…' }))
+        await new Promise((r) => setTimeout(r, 150))
+      }
+      return { outputPath: 'demo-edited.mp4', outputSize: 12_500_000, info: 'H.264 · 1920×1080' }
+    },
+    onMontageProgress: (cb) => {
+      montageListeners.add(cb)
+      return () => montageListeners.delete(cb)
+    },
     modulesList: async () => [
       {
         id: 'pandoc',
+        group: 'tool' as const,
         name: 'Pandoc',
         version: '3.14',
         description: 'Документы и книги: DOCX, ODT, RTF, HTML, Markdown, EPUB, FB2 и PDF',
@@ -343,6 +387,10 @@ export function installDevMock(): void {
         ssim: 0.91,
         verdict: 'noticeable' as const
       }
+    },
+    stickerImage: async () => {
+      const { image } = demoSprite()
+      return { dataUrl: image.toDataURL('image/png'), width: image.width, height: image.height }
     },
     previewImage: async () => {
       const { image } = demoSprite()

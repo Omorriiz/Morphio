@@ -1,4 +1,5 @@
 import { INPUT_IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from '@shared/types'
+import { SUBTITLE_EXTENSIONS } from '@shared/subtitles'
 import type { FileItem, JobProgress } from '@shared/types'
 import { formatBytes, formatDuration } from '../lib'
 import { useI18n } from '../i18n'
@@ -18,6 +19,8 @@ interface Props {
   onEdit?: (file: FileItem, result: JobProgress) => void
   /** Если задано — у готовых картинок и видео появляется кнопка «Сравнить» */
   onCompare?: (file: FileItem, result: JobProgress) => void
+  /** Если задано — у готовых файлов субтитров (в том числе из речи) появляется кнопка редактора */
+  onEditSubs?: (file: FileItem, result: JobProgress) => void
 }
 
 /** Сравнивать можно картинку с картинкой и видео с видео. */
@@ -37,7 +40,8 @@ export default function FileList({
   compact,
   flow,
   onEdit,
-  onCompare
+  onCompare,
+  onEditSubs
 }: Props): React.JSX.Element {
   const { t } = useI18n()
   return (
@@ -100,6 +104,14 @@ export default function FileList({
                     )}
                     {previewResult && <b className="good">{t('Готово')}</b>}
                   </span>
+                  {onEditSubs && p.outputPath && SUBTITLE_EXTENSIONS.includes(p.outputPath.split('.').pop()?.toLowerCase() ?? '') && (
+                    <button className="icon-btn" title={t('Править субтитры')} disabled={running} onClick={() => onEditSubs(f, p)}>
+                      <svg viewBox="0 0 24 24" aria-hidden>
+                        <path d="M4 20h4L19 9l-4-4L4 16z" />
+                        <path d="M13 7l4 4" />
+                      </svg>
+                    </button>
+                  )}
                   {onCompare && comparable(f, p.outputPath) && (
                     <button className="icon-btn" title={t('Сравнить до и после')} disabled={running} onClick={() => onCompare(f, p)}>
                       <svg viewBox="0 0 24 24" aria-hidden>

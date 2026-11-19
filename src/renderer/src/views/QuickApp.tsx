@@ -15,6 +15,7 @@ const KIND_LABEL: Record<FileKind, string> = {
   archive: 'Архивы',
   pdf: 'PDF',
   document: 'Документы',
+  subtitle: 'Субтитры',
   folder: 'Папки',
   other: 'Файлы'
 }

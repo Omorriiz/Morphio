@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatBytes, formatDuration } from '../../src/renderer/src/lib'
-import { MEDIA_PRESETS } from '../../src/renderer/src/mediaPresets'
+import { MEDIA_PRESETS } from '../../src/shared/mediaPresets'
 import { AUDIO_TARGETS, VIDEO_TARGETS } from '../../src/shared/types'
 import { translate } from '../../src/shared/i18n'
 

@@ -11,3 +11,7 @@ export function setMainLanguage(l: Language): void {
 export function tm(text: string, params?: Record<string, string | number>): string {
   return translate(lang, text, params)
 }
+
+export function mainLanguage(): Language {
+  return lang
+}

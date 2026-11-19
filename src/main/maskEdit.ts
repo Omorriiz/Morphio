@@ -1,4 +1,5 @@
-import type { BrushStroke } from '@shared/types'
+import type { BrushStroke, EditOp } from '@shared/types'
+import { applyFillToMask, cleanEdgeColors, computeFill } from '@shared/regionFill'
 
 /**
  * Применяет мазки кисти к маске прозрачности (0..255) прямо в буфере.
@@ -46,6 +47,22 @@ export function applyStrokes(mask: Buffer, width: number, height: number, stroke
         const t = k / count
         stamp(ax + (bx - ax) * t, ay + (by - ay) * t)
       }
+    }
+  }
+}
+
+/**
+ * Применяет всю историю правок по порядку: мазки меняют маску, заливки меняют маску и очищают цвета на краю.
+ * `colors` — RGB по три байта (его меняют на месте, передавайте копию), `mask` — 0..255.
+ */
+export function applyEdits(colors: Buffer, mask: Buffer, width: number, height: number, ops: EditOp[]): void {
+  for (const op of ops) {
+    if ('type' in op && op.type === 'fill') {
+      // сила считается по цветам до очистки краёв: так же, как в окне
+      const r = computeFill(colors, width, height, op)
+      if (applyFillToMask(mask, r.coverage)) cleanEdgeColors(colors, r.coverage, r.color)
+    } else {
+      applyStrokes(mask, width, height, [op as BrushStroke])
     }
   }
 }

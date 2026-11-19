@@ -41,9 +41,13 @@ export function cancelFfmpeg(): void {
   }
 }
 
-export function run(args: string[], onStdoutLine?: (line: string) => void): Promise<RunResult> {
+export function run(
+  args: string[],
+  onStdoutLine?: (line: string) => void,
+  options: { cwd?: string } = {}
+): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(ffmpegBinary(), args, { windowsHide: true })
+    const child = spawn(ffmpegBinary(), args, { windowsHide: true, cwd: options.cwd })
     running.add(child)
     const out: Buffer[] = []
     const err: Buffer[] = []
@@ -185,6 +189,14 @@ export interface MediaProbe {
   width?: number
   height?: number
   fps?: number
+  /** Кодеки и число звуковых дорожек: по ним решаем, можно ли резать без перекодирования */
+  vcodec?: string
+  acodec?: string
+  audioRate?: number
+  audioTracks: number
+  subtitleTracks: number
+  /** Метка поворота в файле, градусы против часовой */
+  rotation: number
 }
 
 /** Быстрый разбор видео- или аудиофайла из вывода `ffmpeg -i`. */
@@ -201,13 +213,21 @@ export async function probeMedia(path: string): Promise<MediaProbe> {
   const rot = /rotat(?:e\s*:|ion of)\s*(-?\d+)/i.exec(stderr)
   if (width && height && rot && Math.abs(Number(rot[1])) % 180 === 90) [width, height] = [height, width]
   const fps = /(\d+(?:\.\d+)?)\s*fps/.exec(stderr)
+  const vc = /Stream #[^\n]*Video: (\w+)/.exec(stderr)
+  const ac = /Stream #[^\n]*Audio: (\w+)[^\n]*?,\s*(\d+) Hz/.exec(stderr)
   return {
     duration,
     hasVideo: !!video && !attached,
     hasAudio,
     width,
     height,
-    fps: fps ? Number(fps[1]) : undefined
+    fps: fps ? Number(fps[1]) : undefined,
+    vcodec: vc?.[1],
+    acodec: ac?.[1],
+    audioRate: ac ? Number(ac[2]) : undefined,
+    audioTracks: [...stderr.matchAll(/Stream #[^\n]*Audio:/g)].length,
+    subtitleTracks: [...stderr.matchAll(/Stream #[^\n]*Subtitle:/g)].length,
+    rotation: rot ? Number(rot[1]) : 0
   }
 }
 

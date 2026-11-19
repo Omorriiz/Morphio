@@ -41,6 +41,7 @@ export async function inspectMedia(paths: string[]): Promise<FileItem[]> {
         width: probe.width,
         height: probe.height,
         hasAudio: probe.hasAudio,
+        subtitleTracks: probe.subtitleTracks,
         thumbnail
       })
     } catch {
@@ -59,7 +60,7 @@ const CRF = {
 } as const
 
 /** Подходящая высота кадра для заданного битрейта: чтобы маленький лимит не давал «кашу». */
-function heightForBitrate(vk: number, srcW: number, srcH: number, fps: number): number | undefined {
+export function heightForBitrate(vk: number, srcW: number, srcH: number, fps: number): number | undefined {
   const pixelsPerSec = srcW * srcH * Math.max(fps, 1)
   if ((vk * 1000) / pixelsPerSec >= 0.05) return undefined
   for (const h of [1080, 720, 480, 360, 240]) {
@@ -71,7 +72,7 @@ function heightForBitrate(vk: number, srcW: number, srcH: number, fps: number): 
 }
 
 /** Параметры видеокодека. bitrate (кбит/с) задан — целимся в размер, иначе постоянное качество. */
-function videoCodecArgs(
+export function videoCodecArgs(
   target: 'mp4' | 'webm' | 'mkv',
   quality: MediaOptions['quality'],
   gpu: GpuKind | null,
@@ -99,7 +100,7 @@ function videoCodecArgs(
   return ['-c:v', 'libx264', '-preset', 'medium', ...(rate ?? ['-crf', String(CRF.x264[quality])])]
 }
 
-function audioCodecArgs(target: MediaOptions['target'], kbps: number): string[] {
+export function audioCodecArgs(target: MediaOptions['target'], kbps: number): string[] {
   switch (target) {
     case 'mp3':
       return ['-c:a', 'libmp3lame', '-b:a', `${kbps}k`]

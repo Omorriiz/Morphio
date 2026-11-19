@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { orderFrames, VIDEO_EXTENSIONS } from '@shared/types'
 import type {
+  GifBgRemoval,
   GifBuildOptions,
+  GifCrop,
+  GifLayer,
   GifFrame,
   GifProgress,
   GifResult,
+  GifSpeedRange,
   VideoExtractResult,
   VideoInfo
 } from '@shared/types'
@@ -12,6 +16,10 @@ import DropOverlay from '../components/DropOverlay'
 import VideoImport from '../components/VideoImport'
 import FramePlayer from '../components/FramePlayer'
 import FrameStrip from '../components/FrameStrip'
+import GifCanvas from '../components/GifCanvas'
+import { BackgroundPanel, CropPanel, LayerPanel, ratioOf } from '../components/GifTools'
+import type { CropAspect } from '../components/GifTools'
+import { commitTextScale, newStickerLayer, newTextLayer, renderEmoji } from '../gifLayers'
 import { useDropZone } from '../hooks/useDropZone'
 import { formatBytes } from '../lib'
 import { useI18n } from '../i18n'
@@ -46,7 +54,19 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
   const [loading, setLoading] = useState(false)
   const [videoPath, setVideoPath] = useState<string | null>(null)
 
-  const [format, setFormat] = useState<'gif' | 'webp'>('gif')
+  const [layers, setLayers] = useState<GifLayer[]>([])
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null)
+  const [crop, setCrop] = useState<GifCrop | undefined>(undefined)
+  const [cropMode, setCropMode] = useState(false)
+  const [cropAspect, setCropAspect] = useState<CropAspect>('free')
+  const [removeBg, setRemoveBg] = useState<GifBgRemoval | null>(null)
+  const [playIndex, setPlayIndex] = useState(0)
+  const [speedRanges, setSpeedRanges] = useState<GifSpeedRange[]>([])
+  const [rangeFactor, setRangeFactor] = useState(2)
+  const [rangeFrom, setRangeFrom] = useState(0)
+  const [rangeTo, setRangeTo] = useState(0)
+
+  const [format, setFormat] = useState<'gif' | 'webp' | 'apng'>('gif')
   const [width, setWidth] = useState<number | undefined>(undefined)
   const [fit, setFit] = useState<'contain' | 'cover'>('contain')
   const [background, setBackground] = useState('transparent')
@@ -109,13 +129,67 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
   useEffect(() => {
     setResult(null)
     setNotice(null)
-  }, [frames, format, width, fit, background, defaultDelay, loop, order, colours, dither, quality, limitSize, targetMB])
+  }, [frames, format, width, fit, background, defaultDelay, loop, order, colours, dither, quality, limitSize, targetMB, layers, crop, removeBg, speedRanges])
 
   const played = useMemo(() => orderFrames(frames, order), [frames, order])
   const totalMs = useMemo(
     () => played.reduce((s, f) => s + (f.delay ?? defaultDelay), 0),
     [played, defaultDelay]
   )
+
+  // ---- слои, обрезка ----
+  const frameIndexOf = (id: string | undefined): number => Math.max(0, frames.findIndex((fr) => fr.id === id))
+  const currentFrameIndex = frameIndexOf(played[Math.min(playIndex, played.length - 1)]?.id)
+  const changeLayer = (id: string, patch: Partial<GifLayer>): void =>
+    setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+  const addLayer = (l: GifLayer): void => {
+    setLayers((prev) => [...prev, l])
+    setSelectedLayerId(l.id)
+    setCropMode(false)
+  }
+  const addText = async (): Promise<void> => addLayer(await newTextLayer())
+  const addEmoji = (emoji: string): void => addLayer(newStickerLayer(renderEmoji(emoji), emoji, 0.2))
+  const addFileSticker = async (): Promise<void> => {
+    const [path] = await window.api.pickFiles()
+    if (!path) return
+    try {
+      const img = await window.api.stickerImage(path, 512)
+      addLayer(newStickerLayer({ png: img.dataUrl, width: img.width, height: img.height }, path.split(/[\\/]/).pop() ?? 'sticker', 0.25))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  const commitLayer = async (id: string): Promise<void> => {
+    const l = layers.find((x) => x.id === id)
+    const patch = l ? await commitTextScale(l) : null
+    if (patch) changeLayer(id, patch)
+  }
+  const removeLayer = (id: string): void => {
+    setLayers((prev) => prev.filter((l) => l.id !== id))
+    if (selectedLayerId === id) setSelectedLayerId(null)
+  }
+  const moveLayer = (id: string, dir: -1 | 1): void =>
+    setLayers((prev) => {
+      const i = prev.findIndex((l) => l.id === id)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= prev.length) return prev
+      const next = [...prev]
+      ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
+  // «Обрезать до этого кадра» и «после этого»: лишние кадры убираются из списка
+  const trimBefore = (): void => {
+    const i = frames.findIndex((fr) => fr.id === selectedId)
+    if (i > 0) setFrames((prev) => prev.slice(i))
+  }
+  const trimAfter = (): void => {
+    const i = frames.findIndex((fr) => fr.id === selectedId)
+    if (i >= 0 && i < frames.length - 1) setFrames((prev) => prev.slice(0, i + 1))
+  }
+  const firstFrame = frames[0]
+  const canvasAspect = firstFrame
+    ? (firstFrame.width * (crop?.w ?? 1)) / (firstFrame.height * (crop?.h ?? 1))
+    : 1
 
   const move = (from: number, to: number): void =>
     setFrames((prev) => {
@@ -160,7 +234,11 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
         colours,
         dither,
         quality,
-        targetKB: limitSize ? Math.round(targetMB * 1024) : undefined,
+        targetKB: limitSize && format !== 'apng' ? Math.round(targetMB * 1024) : undefined,
+        crop,
+        layers: layers.length > 0 ? layers : undefined,
+        speedRanges: speedRanges.length > 0 ? speedRanges : undefined,
+        removeBg: removeBg ?? undefined,
         name: name.trim() || 'animation',
         outputDir
       }
@@ -179,7 +257,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
     setBuilding(true)
     setError(null)
     try {
-      const r = await window.api.exportFrames(frames, dir)
+      const r = await window.api.exportFrames(frames, dir, { crop, layers: layers.length > 0 ? layers : undefined })
       setNotice(t('Сохранено кадров: {n}. Папка: {dir}', { n: r.count, dir: r.dir }))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -230,6 +308,10 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                 onClick={() => {
                   setFrames([])
                   setSelectedId(null)
+                  setLayers([])
+                  setCrop(undefined)
+                  setCropMode(false)
+                  setRemoveBg(null)
                 }}
                 disabled={building}
               >
@@ -285,7 +367,36 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                 selectedId={selectedId}
                 resultUrl={result?.previewUrl}
                 background={background}
+                onIndex={setPlayIndex}
+                renderFrame={(fr) => (
+                  <GifCanvas
+                    frame={fr}
+                    frameIndex={frameIndexOf(fr.id)}
+                    frameCount={frames.length}
+                    aspect={canvasAspect}
+                    crop={crop}
+                    fit={fit}
+                    layers={layers}
+                    selectedLayerId={selectedLayerId}
+                    onSelectLayer={setSelectedLayerId}
+                    onChangeLayer={changeLayer}
+                    onLayerCommit={(id) => void commitLayer(id)}
+                    cropMode={cropMode}
+                    cropRatio={ratioOf(cropAspect)}
+                    onCrop={setCrop}
+                  />
+                )}
               />
+              {selectedId && frames.length > 1 && (
+                <div className="row tight">
+                  <button className="btn ghost" onClick={trimBefore} disabled={building}>
+                    {t('Обрезать до этого кадра')}
+                  </button>
+                  <button className="btn ghost" onClick={trimAfter} disabled={building}>
+                    {t('Обрезать после этого кадра')}
+                  </button>
+                </div>
+              )}
               {result && (
                 <div className="result-card">
                   <div>
@@ -316,6 +427,36 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
 
             <section className="settings">
               <div className="steps">
+                <LayerPanel
+                  layers={layers}
+                  selectedId={selectedLayerId}
+                  frameCount={frames.length}
+                  currentFrame={currentFrameIndex}
+                  disabled={building}
+                  onSelect={setSelectedLayerId}
+                  onAddText={() => void addText()}
+                  onAddEmoji={addEmoji}
+                  onAddFile={() => void addFileSticker()}
+                  onChange={changeLayer}
+                  onRemove={removeLayer}
+                  onMove={moveLayer}
+                />
+                <CropPanel
+                  crop={crop}
+                  mode={cropMode}
+                  aspect={cropAspect}
+                  frameAspect={firstFrame ? firstFrame.width / firstFrame.height : 1}
+                  disabled={building}
+                  onMode={(on) => {
+                    setCropMode(on)
+                    if (on) setSelectedLayerId(null)
+                    if (on) setCrop((c) => c ?? { x: 0.1, y: 0.1, w: 0.8, h: 0.8 })
+                  }}
+                  onAspect={setCropAspect}
+                  onCrop={setCrop}
+                />
+                <BackgroundPanel value={removeBg} format={format} frameCount={frames.length} disabled={building} onChange={setRemoveBg} />
+
                 <div className="step">
                   <strong>{t('Формат')}</strong>
                   <Segmented
@@ -324,7 +465,8 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                     onChange={setFormat}
                     options={[
                       { id: 'gif', label: 'GIF' },
-                      { id: 'webp', label: 'WebP', hint: t('Легче и красивее GIF, открывается в браузерах и мессенджерах') }
+                      { id: 'webp', label: 'WebP', hint: t('Легче и красивее GIF, открывается в браузерах и мессенджерах') },
+                      { id: 'apng', label: 'APNG', hint: t('Мягкие края прозрачности; открывается в браузерах, файл побольше WebP') }
                     ]}
                   />
                   <select
@@ -359,6 +501,71 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                   <button className="btn soft" onClick={resetDelays} disabled={building}>
                     {t('Сбросить задержки кадров')}
                   </button>
+                  <div className="speed-ranges">
+                    <span className="muted small">{t('Часть кадров можно ускорить или замедлить: выберите кадр в ленте и нужные границы')}</span>
+                    <div className="range-row">
+                      <span className="muted small">{t('Кадры с')}</span>
+                      <input
+                        type="number"
+                        className="text-input tiny"
+                        min={1}
+                        max={frames.length}
+                        value={rangeFrom + 1}
+                        disabled={building}
+                        onChange={(e) => setRangeFrom(Math.max(0, Math.min(frames.length - 1, Number(e.target.value) - 1)))}
+                      />
+                      <span className="muted small">{t('по')}</span>
+                      <input
+                        type="number"
+                        className="text-input tiny"
+                        min={1}
+                        max={frames.length}
+                        value={rangeTo + 1}
+                        disabled={building}
+                        onChange={(e) => setRangeTo(Math.max(0, Math.min(frames.length - 1, Number(e.target.value) - 1)))}
+                      />
+                      <select value={rangeFactor} disabled={building} onChange={(e) => setRangeFactor(Number(e.target.value))}>
+                        {[0.25, 0.5, 2, 3, 4].map((x) => (
+                          <option key={x} value={x}>
+                            {x}×
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="row tight">
+                      <button className="btn ghost" disabled={building} onClick={() => setRangeFrom(currentFrameIndex)}>
+                        {t('С текущего кадра')}
+                      </button>
+                      <button className="btn ghost" disabled={building} onClick={() => setRangeTo(currentFrameIndex)}>
+                        {t('По текущий кадр')}
+                      </button>
+                      <button
+                        className="btn soft"
+                        disabled={building || frames.length === 0}
+                        onClick={() => {
+                          const from = Math.min(rangeFrom, rangeTo)
+                          const to = Math.max(rangeFrom, rangeTo)
+                          setSpeedRanges((cur) => [...cur.filter((r) => r.to < from || r.from > to), { from, to, factor: rangeFactor }])
+                        }}
+                      >
+                        {t('Добавить')}
+                      </button>
+                    </div>
+                    {speedRanges.length > 0 && (
+                      <ul className="layer-list">
+                        {speedRanges.map((r) => (
+                          <li key={`${r.from}-${r.to}`} className="layer-row">
+                            <span className="layer-name">
+                              {t('Кадры {a}–{b}: {x}×', { a: r.from + 1, b: r.to + 1, x: r.factor })}
+                            </span>
+                            <button className="icon-btn" title={t('Убрать')} disabled={building} onClick={() => setSpeedRanges((cur) => cur.filter((x) => x !== r))}>
+                              <svg viewBox="0 0 24 24" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
 
                 <div className="step">
@@ -421,7 +628,9 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
 
                 <div className="step">
                   <strong>{t('Качество')}</strong>
-                  {format === 'gif' ? (
+                  {format === 'apng' ? (
+                    <span className="muted small">{t('APNG без потерь: качество не настраивается.')}</span>
+                  ) : format === 'gif' ? (
                     <>
                       <select
                         value={colours}
@@ -466,8 +675,8 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
                   <label className="check">
                     <input
                       type="checkbox"
-                      checked={limitSize}
-                      disabled={building}
+                      checked={limitSize && format !== 'apng'}
+                      disabled={building || format === 'apng'}
                       onChange={(e) => setLimitSize(e.target.checked)}
                     />
                     <span>{t('Уложиться в лимит')}</span>
@@ -543,7 +752,7 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
             )}
           </div>
           <button className="btn primary" onClick={build} disabled={building || loading}>
-            {building ? t('Собираю…') : t('Создать {fmt}', { fmt: format === 'gif' ? 'GIF' : 'WebP' })}
+            {building ? t('Собираю…') : t('Создать {fmt}', { fmt: format === 'gif' ? 'GIF' : format === 'webp' ? 'WebP' : 'APNG' })}
           </button>
         </footer>
       )}

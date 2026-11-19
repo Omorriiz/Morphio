@@ -2,11 +2,15 @@ import { promises as fs } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import sharp from 'sharp'
-import { orderFrames } from '@shared/types'
-import type { GifBuildOptions, GifFrame, GifProgress, GifResult } from '@shared/types'
+import { orderFrames, speedFor } from '@shared/types'
+import type { GifBuildOptions, GifCrop, GifFrame, GifLayer, GifProgress, GifResult } from '@shared/types'
+import { tmpdir } from 'node:os'
 import { openImage } from '../imageInput'
 import { freePath } from '../files'
 import { tm } from '../tm'
+import { predictMask } from './background'
+import { detectSolidBackground, removeSolidBackground } from './solidBackground'
+import { activeLayers, cropRect, croppedSize, matteEdges, overlayLayers, prepareLayers, smoothMasks } from './gifLayers'
 
 export const MAX_FRAMES = 400
 /** Если все кадры анимации в сыром виде весят больше — читаем их по одному. */
@@ -159,48 +163,179 @@ function planAttempts(options: GifBuildOptions): Attempt[] {
   return list
 }
 
-/** Собирает анимацию из кадров. */
+/** APNG собирает FFmpeg: sharp умеет читать анимацию, но не писать APNG. Мягкие края прозрачности сохраняются. */
+async function encodeApng(buffers: Buffer[], w: number, h: number, delays: number[], loop: number): Promise<Buffer> {
+  const { run } = await import('../ffmpeg')
+  const dir = join(tmpdir(), `morphio-apng-${randomUUID().slice(0, 8)}`)
+  await fs.mkdir(dir, { recursive: true })
+  try {
+    const lines: string[] = []
+    for (let i = 0; i < buffers.length; i++) {
+      const name = `f${String(i).padStart(4, '0')}.png`
+      await sharp(buffers[i], { raw: { width: w, height: h, channels: 4 } }).png().toFile(join(dir, name))
+      lines.push(`file '${name}'`, `duration ${(delays[i] / 1000).toFixed(3)}`)
+    }
+    // последний кадр в списке нужно повторить, иначе его длительность теряется
+    lines.push(`file 'f${String(buffers.length - 1).padStart(4, '0')}.png'`)
+    await fs.writeFile(join(dir, 'list.txt'), lines.join('\n'), 'utf8')
+    const out = join(dir, 'out.apng')
+    const r = await run(
+      ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', 'list.txt', '-t', (delays.reduce((a, b) => a + b, 0) / 1000).toFixed(3), '-plays', String(loop), '-pix_fmt', 'rgba', '-fps_mode', 'vfr', '-f', 'apng', out],
+      undefined,
+      { cwd: dir }
+    )
+    if (r.code !== 0) throw new Error(tm('Не удалось собрать APNG: {msg}', { msg: r.stderr.trim().split('\n').pop() ?? '' }))
+    return await fs.readFile(out)
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+}
+
+const hexToRgb = (value: string): { r: number; g: number; b: number } => {
+  const c = parseColor(value)
+  return { r: c.r, g: c.g, b: c.b }
+}
+
+/** Собирает анимацию из кадров: обрезка, удаление фона, вписывание, текст и стикеры, кодирование. */
 export async function buildGif(
   frames: GifFrame[],
   options: GifBuildOptions,
-  report: Report
+  report: Report,
+  ctx: { modelPath?: string } = {}
 ): Promise<GifResult> {
   if (frames.length === 0) throw new Error(tm('Добавьте хотя бы один кадр'))
   const ordered = orderFrames(frames, options.order)
 
-  // Размер холста: по первому кадру списка (не зависит от выбранного порядка проигрывания).
+  // Размер холста: по первому кадру списка после обрезки (не зависит от порядка проигрывания).
   const first = frames[0]
-  const baseW = Math.max(
-    8,
-    Math.round(options.width ?? Math.min(first.width, 1200))
-  )
-  const baseH = Math.max(8, Math.round((baseW * first.height) / first.width))
+  const firstSize = croppedSize(first, options.crop)
+  const baseW = Math.max(8, Math.round(options.width ?? Math.min(firstSize.width, 1200)))
+  const baseH = Math.max(8, Math.round((baseW * firstSize.height) / firstSize.width))
   const bg = options.background === 'transparent' ? { r: 0, g: 0, b: 0, alpha: 0 } : parseColor(options.background)
+  const transparentBg = { r: 0, g: 0, b: 0, alpha: 0 }
 
-  // Каждый уникальный кадр декодируем один раз.
-  const cache = new Map<string, Buffer>()
+  const cropped = async (f: GifFrame): Promise<ReturnType<typeof sharp>> => {
+    const img = await loadFrame(f)
+    return options.crop ? img.extract(cropRect(options.crop, f.width, f.height)) : img
+  }
+
   const unique = [...new Map(ordered.map((f) => [f.id, f])).values()]
-  let done = 0
-  for (const f of unique) {
-    report({ text: tm('Подготавливаю кадры…'), done, total: unique.length })
-    const buf = await (await loadFrame(f))
-      .resize(baseW, baseH, { fit: options.fit, background: bg })
-      .ensureAlpha()
-      .raw()
-      .toBuffer()
-    cache.set(f.id, buf)
-    done++
+  const indexOfId = new Map(frames.map((f, i) => [f.id, i]))
+
+  // ---- удаление фона: решаем один раз по первому кадру, чтобы цвет и допуск не «плавали» ----
+  const rb = options.removeBg
+  let solid: { color: [number, number, number]; tol: number } | null = null
+  let useAi = false
+  const aiW = Math.min(baseW, 768)
+  const aiH = Math.max(8, Math.round((aiW * baseH) / baseW))
+  if (rb) {
+    const rgbOf = async (f: GifFrame, w: number): Promise<{ rgb: Buffer; w: number; h: number }> => {
+      const { data, info } = await (await cropped(f))
+        .resize({ width: w })
+        .removeAlpha()
+        .toColourspace('srgb')
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+      return { rgb: data, w: info.width, h: info.height }
+    }
+    if (rb.method !== 'ai') {
+      const f0 = await rgbOf(unique[0], baseW)
+      const det = detectSolidBackground(f0.rgb, f0.w, f0.h)
+      if (rb.method === 'solid' || det.uniformity >= 0.98) solid = { color: det.color, tol: det.tolerance }
+    }
+    if (!solid) {
+      useAi = true
+      if (!ctx.modelPath) {
+        throw new Error(tm('Фон не однотонный, а модель нейросети не скачана. Скачайте её на вкладке «Удалить фон».'))
+      }
+    }
+  }
+
+  // ---- кадры без слоёв: обрезка → удаление фона → вписывание ----
+  const base = new Map<string, Buffer>()
+  const fitted = (img: ReturnType<typeof sharp>): ReturnType<typeof sharp> =>
+    img.resize(baseW, baseH, { fit: options.fit, background: bg })
+
+  if (useAi) {
+    // Первый проход: маски нейросети для всех кадров (нужны вместе, чтобы сгладить их по времени).
+    const masks: Buffer[] = []
+    for (const [i, f] of unique.entries()) {
+      report({ text: tm('Ищу объект на кадрах…'), done: i, total: unique.length })
+      const rgb = await (await cropped(f)).resize(aiW, aiH, { fit: 'fill' }).removeAlpha().toColourspace('srgb').raw().toBuffer()
+      masks.push(await predictMask(ctx.modelPath!, rgb, aiW, aiH))
+    }
+    const smooth = rb!.smooth ? smoothMasks(masks, 1) : masks
+    for (const [i, f] of unique.entries()) {
+      report({ text: tm('Подготавливаю кадры…'), done: i, total: unique.length })
+      const color = await fitted(await cropped(f)).ensureAlpha().raw().toBuffer()
+      const maskFit = await fitted(sharp(smooth[i], { raw: { width: aiW, height: aiH, channels: 1 } }))
+        .removeAlpha()
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+      const out = Buffer.from(color)
+      for (let p = 0; p < baseW * baseH; p++) {
+        out[p * 4 + 3] = Math.round((color[p * 4 + 3] * maskFit.data[p * maskFit.info.channels]) / 255)
+      }
+      base.set(f.id, out)
+    }
+  } else {
+    for (const [i, f] of unique.entries()) {
+      report({ text: tm('Подготавливаю кадры…'), done: i, total: unique.length })
+      if (solid) {
+        const { data, info } = await (await cropped(f))
+          .resize({ width: baseW })
+          .removeAlpha()
+          .toColourspace('srgb')
+          .raw()
+          .toBuffer({ resolveWithObject: true })
+        const res = removeSolidBackground(data, info.width, info.height, solid.color, solid.tol, true, true)
+        const rgba = Buffer.alloc(info.width * info.height * 4)
+        for (let p = 0; p < info.width * info.height; p++) {
+          rgba[p * 4] = res.rgb[p * 3]
+          rgba[p * 4 + 1] = res.rgb[p * 3 + 1]
+          rgba[p * 4 + 2] = res.rgb[p * 3 + 2]
+          rgba[p * 4 + 3] = res.alpha[p]
+        }
+        base.set(
+          f.id,
+          await fitted(sharp(rgba, { raw: { width: info.width, height: info.height, channels: 4 } })).ensureAlpha().raw().toBuffer()
+        )
+      } else {
+        base.set(f.id, await fitted(await cropped(f)).ensureAlpha().raw().toBuffer())
+      }
+    }
+  }
+
+  // ---- текст и стикеры ----
+  const layers = await prepareLayers(options.layers, baseW, baseH, frames.length)
+  const matte =
+    options.format === 'gif' && options.background === 'transparent' && (!!rb || layers.length > 0)
+      ? hexToRgb(rb?.matte ?? '#ffffff')
+      : null
+  const composedCache = new Map<string, Buffer>()
+  const composed = (f: GifFrame): Buffer => {
+    const idx = indexOfId.get(f.id) ?? 0
+    const active = activeLayers(layers, idx, baseW, baseH)
+    const key = `${f.id}|${active.map((l) => `${l.id}:${l.opacity.toFixed(3)}:${l.left}:${l.top}`).join(',')}`
+    let buf = composedCache.get(key)
+    if (!buf) {
+      buf = overlayLayers(base.get(f.id)!, baseW, baseH, active)
+      if (matte) buf = matteEdges(buf, matte)
+      composedCache.set(key, buf)
+    }
+    return buf
   }
 
   const delays = ordered.map((f) => {
-    const d = f.delay ?? options.defaultDelay
+    const d = (f.delay ?? options.defaultDelay) / speedFor(options.speedRanges, indexOfId.get(f.id) ?? 0)
     // Браузеры показывают слишком короткие задержки GIF (<20 мс) как 100 мс.
     return Math.max(options.format === 'gif' ? 20 : 10, Math.round(d))
   })
 
-  const attempts = planAttempts(options)
+  const attempts = options.format === 'apng' ? [planAttempts({ ...options, targetKB: undefined })[0]] : planAttempts(options)
   let best: { data: Buffer; w: number; h: number; attempt: Attempt } | null = null
-  const limit = options.targetKB ? options.targetKB * 1024 : Infinity
+  const limit = options.targetKB && options.format !== 'apng' ? options.targetKB * 1024 : Infinity
   let reached = !options.targetKB
 
   for (let i = 0; i < attempts.length; i++) {
@@ -215,7 +350,7 @@ export async function buildGif(
 
     const parts: Buffer[] = []
     for (const f of ordered) {
-      const src = cache.get(f.id)!
+      const src = composed(f)
       parts.push(
         a.scale === 1
           ? src
@@ -225,30 +360,34 @@ export async function buildGif(
               .toBuffer()
       )
     }
-    const stack = Buffer.concat(parts)
-    const img = sharp(stack, {
-      raw: { width: w, height: h * ordered.length, channels: 4, pageHeight: h }
-    })
-    const data =
-      options.format === 'gif'
-        ? await img
-            .gif({
-              delay: delays,
-              loop: options.loop,
-              colours: Math.min(256, Math.max(2, a.colours)),
-              dither: options.dither ? 1 : 0,
-              effort: 7
-            })
-            .toBuffer()
-        : await img
-            .webp({
-              delay: delays,
-              loop: options.loop,
-              quality: Math.min(100, Math.max(1, a.quality)),
-              alphaQuality: 90,
-              effort: 4
-            })
-            .toBuffer()
+    let data: Buffer
+    if (options.format === 'apng') {
+      data = await encodeApng(parts, w, h, delays, options.loop)
+    } else {
+      const img = sharp(Buffer.concat(parts), {
+        raw: { width: w, height: h * ordered.length, channels: 4, pageHeight: h }
+      })
+      data =
+        options.format === 'gif'
+          ? await img
+              .gif({
+                delay: delays,
+                loop: options.loop,
+                colours: Math.min(256, Math.max(2, a.colours)),
+                dither: options.dither ? 1 : 0,
+                effort: 7
+              })
+              .toBuffer()
+          : await img
+              .webp({
+                delay: delays,
+                loop: options.loop,
+                quality: Math.min(100, Math.max(1, a.quality)),
+                alphaQuality: 90,
+                effort: 4
+              })
+              .toBuffer()
+    }
 
     best = { data, w, h, attempt: a }
     if (data.length <= limit) {
@@ -264,12 +403,12 @@ export async function buildGif(
   const outputPath = await freePath(dir, safeName, options.format)
   await fs.writeFile(outputPath, result.data)
 
-  const mime = options.format === 'gif' ? 'image/gif' : 'image/webp'
+  const mime = options.format === 'gif' ? 'image/gif' : options.format === 'webp' ? 'image/webp' : 'image/png'
   const a = result.attempt
   const degraded =
     !!options.targetKB &&
-    (a.scale !== 1 ||
-      (options.format === 'gif' ? a.colours !== options.colours : a.quality !== options.quality))
+    options.format !== 'apng' &&
+    (a.scale !== 1 || (options.format === 'gif' ? a.colours !== options.colours : a.quality !== options.quality))
   return {
     outputPath,
     outputSize: result.data.length,
@@ -277,7 +416,7 @@ export async function buildGif(
     height: result.h,
     frames: ordered.length,
     note: degraded ? tm('Чтобы уложиться в размер: {label}', { label: result.attempt.label }) : undefined,
-    reachedTarget: options.targetKB ? reached : undefined,
+    reachedTarget: options.targetKB && options.format !== 'apng' ? reached : undefined,
     previewUrl:
       result.data.length <= 12 * 1024 * 1024
         ? `data:${mime};base64,${result.data.toString('base64')}`
@@ -289,7 +428,8 @@ export async function buildGif(
 export async function exportFrames(
   frames: GifFrame[],
   outputDir: string,
-  report: Report
+  report: Report,
+  extra: { crop?: GifCrop; layers?: GifLayer[] } = {}
 ): Promise<{ dir: string; count: number }> {
   const first = frames[0]
   if (!first) throw new Error(tm('Нет кадров'))
@@ -305,12 +445,29 @@ export async function exportFrames(
     }
   }
   await fs.mkdir(dir, { recursive: true })
+  const size = croppedSize(first, extra.crop)
+  const canvasW = Math.min(size.width, 4096)
+  const canvasH = Math.max(1, Math.round((canvasW * size.height) / size.width))
+  const prepared = await prepareLayers(extra.layers, canvasW, canvasH, frames.length)
   const pad = String(frames.length).length < 3 ? 3 : String(frames.length).length
   for (let i = 0; i < frames.length; i++) {
     report({ text: tm('Сохраняю кадры…'), done: i, total: frames.length })
-    await (await loadFrame(frames[i]))
-      .png()
-      .toFile(join(dir, `${base}-${String(i + 1).padStart(pad, '0')}.png`))
+    const file = join(dir, `${base}-${String(i + 1).padStart(pad, '0')}.png`)
+    if (!extra.crop && !(extra.layers?.length ?? 0)) {
+      await (await loadFrame(frames[i])).png().toFile(file)
+      continue
+    }
+    // с рамкой и слоями: все кадры приводятся к размеру первого кадра после обрезки
+    const f = frames[i]
+    let img = await loadFrame(f)
+    if (extra.crop) img = img.extract(cropRect(extra.crop, f.width, f.height))
+    const { data, info } = await img
+      .resize(canvasW, canvasH, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    const out = overlayLayers(data, info.width, info.height, activeLayers(prepared, i, info.width, info.height))
+    await sharp(out, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toFile(file)
   }
   return { dir, count: frames.length }
 }

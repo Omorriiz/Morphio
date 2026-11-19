@@ -41,7 +41,7 @@ export function backgroundProvider(): string {
 }
 
 /** Возвращает маску 0..255 того же размера, что и исходное изображение. */
-async function predictMask(
+export async function predictMask(
   modelPath: string,
   rgb: Buffer,
   width: number,

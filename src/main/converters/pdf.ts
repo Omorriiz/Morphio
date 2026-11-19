@@ -120,6 +120,33 @@ export async function pdfToText(
 
 // ---------- PDF → картинки ----------
 
+/** Рисует страницы PDF по одной и отдаёт каждую как PNG (для распознавания текста и т. п.). */
+export async function forEachPdfPage(
+  path: string,
+  password: string | undefined,
+  scale: number,
+  onPage: (png: Buffer, n: number, total: number) => Promise<void>
+): Promise<number> {
+  const { createCanvas } = canvasModule()
+  const { doc, close } = await openDoc(path, password)
+  try {
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n)
+      const viewport = page.getViewport({ scale })
+      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      await page.render({ canvasContext: ctx as never, canvas: canvas as never, viewport }).promise
+      await onPage(canvas.toBuffer('image/png'), n, doc.numPages)
+      page.cleanup()
+    }
+    return doc.numPages
+  } finally {
+    await close()
+  }
+}
+
 export async function pdfToImages(
   item: FileItem,
   format: 'png' | 'jpg',

@@ -3,6 +3,7 @@ import { basename, dirname, extname, join } from 'node:path'
 import sharp from 'sharp'
 import type { ConvertOptions, FileItem, ImageFormat } from '@shared/types'
 import { openImage, type SharpImage } from '../imageInput'
+import { freePath } from '../files'
 
 const EXT_FOR: Record<ConvertOptions['format'], string> = {
   png: 'png',
@@ -11,26 +12,6 @@ const EXT_FOR: Record<ConvertOptions['format'], string> = {
   avif: 'avif',
   tiff: 'tiff',
   gif: 'gif'
-}
-
-/** Подбирает свободное имя, чтобы никогда не перезаписывать существующие файлы. */
-async function freePath(dir: string, base: string, ext: string): Promise<string> {
-  let candidate = join(dir, `${base}.${ext}`)
-  let n = 1
-  while (await exists(candidate)) {
-    candidate = join(dir, `${base} (${n}).${ext}`)
-    n++
-  }
-  return candidate
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await fs.access(path)
-    return true
-  } catch {
-    return false
-  }
 }
 
 /**

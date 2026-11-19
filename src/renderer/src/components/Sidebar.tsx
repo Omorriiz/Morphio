@@ -1,7 +1,7 @@
 import logoMark from '../assets/logo-mark.png'
 import { useI18n } from '../i18n'
 
-export type ViewId = 'convert' | 'photo' | 'gif' | 'settings'
+export type ViewId = 'convert' | 'photo' | 'montage' | 'gif' | 'settings'
 
 interface Props {
   active: ViewId
@@ -33,6 +33,18 @@ const MAIN: Item[] = [
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden>
         <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
+      </svg>
+    )
+  },
+  {
+    id: 'montage',
+    label: 'Монтаж',
+    hint: 'Обрезка, склейка, поворот, субтитры, громкость',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <circle cx="6" cy="7" r="2.5" />
+        <circle cx="6" cy="17" r="2.5" />
+        <path d="M8 8.5L20 18M8 15.5L20 6" />
       </svg>
     )
   },

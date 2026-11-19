@@ -11,6 +11,10 @@ interface Props {
   /** Готовый результат — показываем вместо покадрового просмотра */
   resultUrl?: string | null
   background?: string
+  /** Сообщает номер показанного кадра (в порядке проигрывания) */
+  onIndex?: (index: number) => void
+  /** Своё содержимое сцены вместо картинки кадра (редактор слоёв) */
+  renderFrame?: (frame: GifFrame, index: number) => React.ReactNode
 }
 
 /** Проигрыватель: показывает анимацию так, как она будет выглядеть, с задержками каждого кадра. */
@@ -19,7 +23,9 @@ export default function FramePlayer({
   defaultDelay,
   selectedId,
   resultUrl,
-  background
+  background,
+  onIndex,
+  renderFrame
 }: Props): React.JSX.Element {
   const { t } = useI18n()
   const [playing, setPlaying] = useState(true)
@@ -50,6 +56,11 @@ export default function FramePlayer({
   }, [playing, index, frames, defaultDelay, resultUrl])
 
   const current = frames[Math.min(index, frames.length - 1)]
+  const shownIndex = Math.min(index, Math.max(0, frames.length - 1))
+  useEffect(() => {
+    onIndex?.(shownIndex)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownIndex])
 
   return (
     <div className="player">
@@ -60,7 +71,7 @@ export default function FramePlayer({
         {resultUrl ? (
           <img src={resultUrl} alt={t('Результат')} />
         ) : current ? (
-          <img src={current.preview} alt={current.name} />
+          (renderFrame?.(current, shownIndex) ?? <img src={current.preview} alt={current.name} />)
         ) : (
           <span className="muted">{t('Нет кадров')}</span>
         )}

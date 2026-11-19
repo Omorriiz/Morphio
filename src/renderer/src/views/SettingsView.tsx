@@ -142,29 +142,36 @@ export default function SettingsView({ active }: { active: boolean }): React.JSX
           <span className="muted small">
             {t('Тяжёлые программы не входят в установщик и скачиваются только по вашей кнопке. После скачивания они работают без интернета.')}
           </span>
+          {(['tool', 'model'] as const).map((group) => (
+            <div key={group} className="module-group">
+              <span className="field-label">{group === 'tool' ? t('Программы') : t('Нейросети и языки')}</span>
+              <ul className="rule-list">
+                {mods.modules.filter((m) => m.group === group).map((m) => (
+                  <li key={m.id} className="module-row">
+                    <div className="rule-text">
+                      <div className="file-name">
+                        {t(m.name)} {m.version}
+                      </div>
+                      <div className="muted small">{t(m.description)}</div>
+                      <div className="muted small">
+                        {t('Лицензия {license}, источник {source}, {size} МБ', { license: m.license, source: m.source, size: m.sizeMB })}
+                      </div>
+                      {!m.installed && <ModuleDownload info={m} progress={mods.progress[m.id]} onInstall={() => void mods.install(m.id)} />}
+                    </div>
+                    {m.installed ? (
+                      <>
+                        <span className="good small">{t('Установлен')}</span>
+                        <button className="btn ghost" onClick={() => void mods.remove(m.id)}>
+                          {t('Удалить')}
+                        </button>
+                      </>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
           <ul className="rule-list">
-            {mods.modules.map((m) => (
-              <li key={m.id} className="module-row">
-                <div className="rule-text">
-                  <div className="file-name">
-                    {m.name} {m.version}
-                  </div>
-                  <div className="muted small">{t(m.description)}</div>
-                  <div className="muted small">
-                    {t('Лицензия {license}, источник {source}, {size} МБ', { license: m.license, source: m.source, size: m.sizeMB })}
-                  </div>
-                  {!m.installed && <ModuleDownload info={m} progress={mods.progress[m.id]} onInstall={() => void mods.install(m.id)} />}
-                </div>
-                {m.installed ? (
-                  <>
-                    <span className="good small">{t('Установлен')}</span>
-                    <button className="btn ghost" onClick={() => void mods.remove(m.id)}>
-                      {t('Удалить')}
-                    </button>
-                  </>
-                ) : null}
-              </li>
-            ))}
             <li className="module-row">
               <div className="rule-text">
                 <div className="file-name">Calibre</div>

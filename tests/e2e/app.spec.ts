@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process'
 import { promises as fs } from 'node:fs'
+import ffmpegPath from 'ffmpeg-static'
 import { join } from 'node:path'
 import { copyToWork, exists, expect, test } from './fixtures'
 
@@ -6,11 +8,11 @@ const primary = '.action-bar .btn.primary:visible'
 const card = (label: string): string => `.format-card:has(b:text-is("${label}"))`
 
 test.describe('запуск и разделы', () => {
-  test('окно открывается, три раздела и значок настроек справа от названия', async ({ launch }) => {
+  test('окно открывается, четыре раздела и значок настроек справа от названия', async ({ launch }) => {
     const { page } = await launch()
     await expect(page).toHaveTitle('Morphio')
     const items = page.locator('.nav-item')
-    await expect(items).toHaveText(['Converter', 'Photo & background', 'GIF studio'])
+    await expect(items).toHaveText(['Converter', 'Photo & background', 'Montage', 'GIF studio'])
     await expect(page.locator('.nav-item.active')).toHaveText('Converter')
     await expect(page.locator('h1:visible')).toContainText('Any file into anything')
     // кнопка настроек — только значок, без текста, в одной строке с названием
@@ -227,6 +229,127 @@ test.describe('конвертер', () => {
     await expect(page.locator('.file-card.error:visible')).toHaveCount(1)
     expect(await exists(join(ok.dir, 'продажи.yaml'))).toBe(true)
     expect(await exists(join(bad.dir, 'битый.yaml'))).toBe(false)
+  })
+})
+
+test.describe('монтаж', () => {
+  function probe(path: string): { duration: number; size: string } {
+    let text = ''
+    try {
+      execFileSync(ffmpegPath as string, ['-hide_banner', '-i', path], { stdio: 'pipe' })
+    } catch (e) {
+      text = String((e as { stderr?: Buffer }).stderr)
+    }
+    const d = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(text)
+    const v = /Video:[^\n]*?,\s*(\d{2,5}x\d{2,5})/.exec(text)
+    return { duration: d ? Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3]) : 0, size: v?.[1] ?? '' }
+  }
+
+  test('обрезка и поворот: выбираем видео, ставим конец, сохраняем', async ({ launch, assets }) => {
+    const work = await copyToWork(assets.video)
+    const { app, page } = await launch()
+    // окно выбора файла заменяем: оно системное и в тесте недоступно
+    await app.evaluate(({ dialog }, file) => {
+      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [file] })) as never
+    }, work.path)
+    await page.locator('.nav-item', { hasText: 'Montage' }).click()
+    await expect(page.locator('h1:visible')).toContainText('Video montage')
+    await page.locator('button', { hasText: 'Choose video' }).click()
+    await expect(page.locator('.clip-row')).toHaveCount(1)
+    await expect(page.locator('.trim-strip')).toBeVisible()
+
+    // конец отрезка — 1,5 с, поворот на 90°
+    const end = page.locator('.time-input').nth(1)
+    await end.fill('0:01.5')
+    await end.press('Enter')
+    await expect(page.locator('.clip-meta')).toContainText('of')
+    await page.locator('.montage .segmented button', { hasText: '90°' }).click()
+    await page.locator('.cv-footer .btn.primary', { hasText: 'Save' }).click()
+    await expect(page.locator('.montage-status')).toContainText('Done!', { timeout: 60_000 })
+    const out = join(work.dir, 'ролик-edited.mp4')
+    expect(await exists(out)).toBe(true)
+    const info = probe(out)
+    expect(info.duration).toBeGreaterThan(1.2)
+    expect(info.duration).toBeLessThan(2)
+    expect(info.size).toBe('360x640')
+    // оригинал цел
+    expect(probe(work.path).duration).toBeGreaterThan(2.5)
+  })
+
+  test('быстрая обрезка без перекодирования и склейка двух клипов', async ({ launch, assets }) => {
+    const work = await copyToWork(assets.video)
+    const { app, page } = await launch()
+    await app.evaluate(({ dialog }, file) => {
+      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [file, file] })) as never
+    }, work.path)
+    await page.locator('.nav-item', { hasText: 'Montage' }).click()
+    await page.locator('button', { hasText: 'Choose video' }).click()
+    await expect(page.locator('.clip-row')).toHaveCount(2)
+    await expect(page.locator('.notice', { hasText: 'joined in list order' })).toBeVisible()
+    await page.locator('.cv-footer .btn.primary', { hasText: 'Save' }).click()
+    await expect(page.locator('.montage-status')).toContainText('Done!', { timeout: 60_000 })
+    expect(probe(join(work.dir, 'ролик-edited.mp4')).duration).toBeGreaterThan(5.5)
+    // порядок клипов меняется, лишний клип убирается
+    await page.locator('.clip-row').first().locator('button[title="Remove"]').click()
+    await expect(page.locator('.clip-row')).toHaveCount(1)
+    await page.locator('.segmented button', { hasText: 'Fast' }).click()
+    await page.locator('.cv-footer .btn.primary', { hasText: 'Save' }).click()
+    await expect(page.locator('.montage-status')).toContainText('no re-encoding', { timeout: 60_000 })
+  })
+})
+
+test.describe('цепочки для всех видов файлов', () => {
+  test('видео, звук и картинка проходят каждый через свою ветку', async ({ launch, assets }) => {
+    const video = await copyToWork(assets.video)
+    const audio = await copyToWork(assets.audio)
+    const image = await copyToWork(assets.image)
+    const { app, page } = await launch()
+    await app.evaluate(({ dialog }, files) => {
+      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: files })) as never
+    }, [video.path, audio.path, image.path])
+    await page.locator('.nav-item', { hasText: 'Photo' }).click()
+    await page.locator('.subtabs .segmented button', { hasText: 'Chains' }).click()
+    await page.locator('.subview:visible button', { hasText: 'Choose files' }).click()
+    await expect(page.locator('.file-card:visible')).toHaveCount(3)
+    await page.locator('.subview:visible .cv-footer .btn.primary').click()
+    await expect(page.locator('.file-card.done:visible')).toHaveCount(3, { timeout: 90_000 })
+    expect(await exists(join(video.dir, 'ролик-morphio.mp4'))).toBe(true)
+    expect(await exists(join(audio.dir, 'мелодия-morphio.mp3'))).toBe(true)
+    expect(await exists(join(image.dir, 'закат-morphio.webp'))).toBe(true)
+  })
+
+  test('готовая цепочка «Подкаст» выключает чужие ветки: видео получает понятную ошибку, звук обрабатывается', async ({ launch, assets }) => {
+    const video = await copyToWork(assets.video)
+    const audio = await copyToWork(assets.audio)
+    const { app, page } = await launch()
+    await app.evaluate(({ dialog }, files) => {
+      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: files })) as never
+    }, [video.path, audio.path])
+    await page.locator('.nav-item', { hasText: 'Photo' }).click()
+    await page.locator('.subtabs .segmented button', { hasText: 'Chains' }).click()
+    await page.locator('.subview:visible button', { hasText: 'Choose files' }).click()
+    await expect(page.locator('.file-card:visible')).toHaveCount(2)
+    await page.locator('.subview:visible .chip', { hasText: 'Podcast' }).click()
+    await page.locator('.subview:visible .cv-footer .btn.primary').click()
+    await expect(page.locator('.file-card.done:visible')).toHaveCount(1, { timeout: 60_000 })
+    await expect(page.locator('.file-card.error:visible')).toHaveCount(1)
+    expect(await exists(join(audio.dir, 'мелодия-podcast.mp3'))).toBe(true)
+    expect(await exists(join(video.dir, 'ролик-morphio.mp4'))).toBe(false)
+  })
+
+  test('старые сохранённые цепочки (только картинки) открываются после обновления', async ({ launch }) => {
+    const { page } = await launch()
+    await page.evaluate(() => {
+      localStorage.removeItem('morphio.chains')
+      localStorage.setItem('morphio.pipelines', JSON.stringify([{ id: 'u1', name: 'Моя старая', config: { format: 'jpg', removeBg: false, maxSize: 800, quality: 70, nameTemplate: '{name}-old' } }]))
+    })
+    await page.reload()
+    await page.locator('.nav-item', { hasText: 'Photo' }).click()
+    await page.locator('.subtabs .segmented button', { hasText: 'Chains' }).click()
+    const chip = page.locator('.subview:visible .chip', { hasText: 'Моя старая' })
+    await expect(chip).toBeVisible()
+    await chip.click()
+    await expect(page.locator('.subview:visible .text-input[placeholder="{name}"]').first()).toHaveValue('{name}-old')
   })
 })
 

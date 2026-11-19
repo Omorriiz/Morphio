@@ -17,21 +17,9 @@ const EXT: Record<PipelineConfig['format'], string> = {
   gif: 'gif'
 }
 
-/** Подставляет в шаблон имени {name}, {n}, {date}, {format} и убирает запрещённые символы. */
-export function resolveName(
-  template: string,
-  ctx: { name: string; n: number; format: string }
-): string {
-  const date = new Date().toISOString().slice(0, 10)
-  const out = template
-    .replaceAll('{name}', ctx.name)
-    .replaceAll('{n}', String(ctx.n).padStart(3, '0'))
-    .replaceAll('{date}', date)
-    .replaceAll('{format}', ctx.format)
-    .replace(/[\\/:*?"<>|]/g, '_')
-    .trim()
-  return out || ctx.name
-}
+import { resolveName } from '@shared/chains'
+
+export { resolveName }
 
 /** Выполняет всю цепочку для одного файла. */
 export async function runPipelineItem(

@@ -3,6 +3,7 @@ import Sidebar, { type ViewId } from './components/Sidebar'
 import ConvertView from './views/ConvertView'
 import PhotoView from './views/PhotoView'
 import GifView from './views/GifView'
+import MontageView from './views/MontageView'
 import SettingsView from './views/SettingsView'
 
 export default function App(): React.JSX.Element {
@@ -31,6 +32,9 @@ export default function App(): React.JSX.Element {
         </div>
         <div className="view" hidden={view !== 'photo'}>
           <PhotoView active={view === 'photo'} />
+        </div>
+        <div className="view" hidden={view !== 'montage'}>
+          <MontageView active={view === 'montage'} />
         </div>
         <div className="view" hidden={view !== 'gif'}>
           <GifView active={view === 'gif'} />

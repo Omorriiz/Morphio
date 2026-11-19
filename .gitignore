@@ -6,3 +6,4 @@ models/
 Morphio.exe
 *.log
 modules/
+models-release/

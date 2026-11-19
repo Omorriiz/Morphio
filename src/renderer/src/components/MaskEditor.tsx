@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { applyFillToMask, computeFill } from '@shared/regionFill'
+import type { EditOp, FillOp } from '@shared/types'
 import type {
   BgRemoveOptions,
   BrushStroke,
@@ -20,6 +22,26 @@ interface Props {
 
 /** Мазок в координатах превью (то, что видит пользователь). */
 type PStroke = BrushStroke
+
+/** Шаг истории: мазок или заливка (у заливки хранится посчитанная сила, чтобы не считать заново при отмене). */
+interface Entry {
+  op: PStroke | FillOp
+  cov?: Uint8Array
+}
+
+/** Накладывает заливку на маску окна: новая прозрачность — минимум из текущей и «255 − сила». */
+function applyCoverage(canvas: HTMLCanvasElement, cov: Uint8Array): boolean {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const alpha = new Uint8ClampedArray(cov.length)
+  for (let i = 0; i < cov.length; i++) alpha[i] = img.data[i * 4 + 3]
+  const changed = applyFillToMask(alpha, cov)
+  if (changed) {
+    for (let i = 0; i < cov.length; i++) img.data[i * 4 + 3] = alpha[i]
+    ctx.putImageData(img, 0, 0)
+  }
+  return changed
+}
 
 const loadImage = (src: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -91,7 +113,14 @@ export default function MaskEditor({
   const { t } = useI18n()
   const [session, setSession] = useState<MaskEditSession | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [tool, setTool] = useState<'erase' | 'restore'>('erase')
+  const [tool, setTool] = useState<'erase' | 'restore' | 'fill'>('erase')
+  const [tolerance, setTolerance] = useState(20)
+  const [contiguous, setContiguous] = useState(true)
+  const [colorSource, setColorSource] = useState<'cursor' | 'pipette'>('cursor')
+  const [pipette, setPipette] = useState<[number, number, number] | null>(null)
+  const [picking, setPicking] = useState(false)
+  const [feather, setFeather] = useState(30)
+  const [highlight, setHighlight] = useState(true)
   const [radius, setRadius] = useState(24)
   const [ghost, setGhost] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -105,8 +134,14 @@ export default function MaskEditor({
   const maskCanvas = useRef<HTMLCanvasElement | null>(null)
   const initialMask = useRef<HTMLCanvasElement | null>(null)
   const tmpCanvas = useRef<HTMLCanvasElement | null>(null)
-  const strokes = useRef<PStroke[]>([])
-  const redoStack = useRef<PStroke[]>([])
+  const strokes = useRef<Entry[]>([])
+  const redoStack = useRef<Entry[]>([])
+  const pixels = useRef<Uint8Array | null>(null)
+  const hoverCov = useRef<Uint8Array | null>(null)
+  const hoverCanvas = useRef<HTMLCanvasElement | null>(null)
+  const hoverKey = useRef('')
+  const fillRef = useRef({ tool, tolerance, contiguous, colorSource, pipette, picking, feather, highlight })
+  fillRef.current = { tool, tolerance, contiguous, colorSource, pipette, picking, feather, highlight }
   const current = useRef<PStroke | null>(null)
   const panning = useRef<{ sx: number; sy: number; vx: number; vy: number } | null>(null)
   const spaceDown = useRef(false)
@@ -144,6 +179,7 @@ export default function MaskEditor({
         ctx.globalAlpha = 1
       }
       ctx.drawImage(tmp, 0, 0)
+      if (hoverCov.current && hoverCanvas.current) ctx.drawImage(hoverCanvas.current, 0, 0)
     })
   }, [])
 
@@ -176,6 +212,15 @@ export default function MaskEditor({
         const init = makeCanvas(w, h)
         init.getContext('2d')!.drawImage(mc, 0, 0)
 
+        const rgba = ic.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, w, h).data
+        const rgb = new Uint8Array(w * h * 3)
+        for (let i = 0; i < w * h; i++) {
+          rgb[i * 3] = rgba[i * 4]
+          rgb[i * 3 + 1] = rgba[i * 4 + 1]
+          rgb[i * 3 + 2] = rgba[i * 4 + 2]
+        }
+        pixels.current = rgb
+        hoverCanvas.current = makeCanvas(w, h)
         imgCanvas.current = ic
         maskCanvas.current = mc
         initialMask.current = init
@@ -209,6 +254,80 @@ export default function MaskEditor({
 
   useEffect(render, [ghost, render])
 
+  const replayEntry = (mc: HTMLCanvasElement, e: Entry): void => {
+    if ('type' in e.op && e.op.type === 'fill') {
+      if (e.cov) applyCoverage(mc, e.cov)
+    } else replay(mc.getContext('2d')!, e.op as PStroke)
+  }
+
+  const clearHover = (): void => {
+    if (!hoverCov.current) return
+    hoverCov.current = null
+    hoverKey.current = ''
+    render()
+  }
+
+  /** Параметры заливки для точки (в координатах превью). */
+  const fillParams = (x: number, y: number): FillOp => {
+    const f = fillRef.current
+    return {
+      type: 'fill',
+      x,
+      y,
+      tolerance: f.tolerance,
+      contiguous: f.contiguous,
+      color: f.colorSource === 'pipette' && f.pipette ? f.pipette : undefined,
+      feather: f.feather / 100
+    }
+  }
+
+  /** Подсветка: область, которую заберёт заливка в этой точке. */
+  const updateHover = (x: number, y: number): void => {
+    const f = fillRef.current
+    const px = pixels.current
+    const hc = hoverCanvas.current
+    if (!px || !hc || f.tool !== 'fill' || !f.highlight || f.picking || (f.colorSource === 'pipette' && !f.pipette)) {
+      clearHover()
+      return
+    }
+    const key = `${Math.floor(x)},${Math.floor(y)},${f.tolerance},${f.contiguous},${f.colorSource},${f.feather}`
+    if (key === hoverKey.current) return
+    hoverKey.current = key
+    const w = hc.width
+    const h = hc.height
+    const r = computeFill(px, w, h, fillParams(x, y))
+    const ctx = hc.getContext('2d')!
+    const img = ctx.createImageData(w, h)
+    for (let i = 0; i < r.coverage.length; i++) {
+      const c = r.coverage[i]
+      if (c === 0) continue
+      img.data[i * 4] = 255
+      img.data[i * 4 + 1] = 0
+      img.data[i * 4 + 2] = 160
+      img.data[i * 4 + 3] = Math.round(c * 0.5)
+    }
+    ctx.putImageData(img, 0, 0)
+    hoverCov.current = r.count > 0 ? r.coverage : null
+    render()
+  }
+
+  /** Клик заливкой: убирает область; пустой или уже прозрачный клик в историю не попадает. */
+  const doFill = (x: number, y: number): void => {
+    const px = pixels.current
+    const mc = maskCanvas.current
+    if (!px || !mc) return
+    const op = fillParams(x, y)
+    const r = computeFill(px, mc.width, mc.height, op)
+    if (r.count === 0) return
+    if (!applyCoverage(mc, r.coverage)) return
+    strokes.current.push({ op, cov: r.coverage })
+    redoStack.current = []
+    hoverKey.current = ''
+    hoverCov.current = null
+    render()
+    syncHistory()
+  }
+
   const rebuildMask = (): void => {
     const mc = maskCanvas.current
     const init = initialMask.current
@@ -216,11 +335,13 @@ export default function MaskEditor({
     const ctx = mc.getContext('2d')!
     ctx.clearRect(0, 0, mc.width, mc.height)
     ctx.drawImage(init, 0, 0)
-    strokes.current.forEach((s) => replay(ctx, s))
+    strokes.current.forEach((e) => replayEntry(mc, e))
     render()
   }
 
   const undo = (): void => {
+    hoverCov.current = null
+    hoverKey.current = ''
     const s = strokes.current.pop()
     if (!s) return
     redoStack.current.push(s)
@@ -233,7 +354,7 @@ export default function MaskEditor({
     if (!s) return
     strokes.current.push(s)
     const mc = maskCanvas.current
-    if (mc) replay(mc.getContext('2d')!, s)
+    if (mc) replayEntry(mc, s)
     render()
     syncHistory()
   }
@@ -265,8 +386,14 @@ export default function MaskEditor({
         redo()
       } else if (!mod && e.key.toLowerCase() === 'e') setTool('erase')
       else if (!mod && e.key.toLowerCase() === 'r') setTool('restore')
-      else if (e.key === '[') setRadius((r) => Math.max(3, Math.round(r * 0.8)))
-      else if (e.key === ']') setRadius((r) => Math.min(150, Math.round(r * 1.25)))
+      else if (!mod && e.key.toLowerCase() === 'g') setTool('fill')
+      else if (e.key === '[') {
+        if (fillRef.current.tool === 'fill') setTolerance((x) => Math.max(1, Math.round(x * 0.8)))
+        else setRadius((r) => Math.max(3, Math.round(r * 0.8)))
+      } else if (e.key === ']') {
+        if (fillRef.current.tool === 'fill') setTolerance((x) => Math.min(100, Math.max(x + 1, Math.round(x * 1.25))))
+        else setRadius((r) => Math.min(150, Math.round(r * 1.25)))
+      }
     }
     const up = (e: KeyboardEvent): void => {
       if (e.code === 'Space') spaceDown.current = false
@@ -299,6 +426,21 @@ export default function MaskEditor({
     }
     if (e.button !== 0) return
     const { x, y } = toImage(e)
+    if (tool === 'fill') {
+      const w = pixels.current ? maskCanvas.current!.width : 0
+      if (x < 0 || y < 0 || x >= w || y >= maskCanvas.current!.height) return
+      if (picking) {
+        const i = (Math.floor(y) * w + Math.floor(x)) * 3
+        const px = pixels.current!
+        setPipette([px[i], px[i + 1], px[i + 2]])
+        setColorSource('pipette')
+        setPicking(false)
+        clearHover()
+        return
+      }
+      doFill(x, y)
+      return
+    }
     current.current = { mode: tool, radius, points: [x, y] }
     const mc = maskCanvas.current
     if (mc) stamp(mc.getContext('2d')!, x, y, radius, tool)
@@ -314,7 +456,13 @@ export default function MaskEditor({
       return
     }
     const s = current.current
-    if (!s) return
+    if (!s) {
+      if (tool === 'fill') {
+        const p = toImage(e)
+        updateHover(p.x, p.y)
+      }
+      return
+    }
     const { x, y } = toImage(e)
     const n = s.points.length
     const px = s.points[n - 2]
@@ -330,7 +478,7 @@ export default function MaskEditor({
     panning.current = null
     const s = current.current
     if (s) {
-      strokes.current.push(s)
+      strokes.current.push({ op: s })
       redoStack.current = []
       current.current = null
       syncHistory()
@@ -354,11 +502,11 @@ export default function MaskEditor({
     try {
       // Мазки переводим из координат превью в координаты исходного изображения.
       const ratio = session.width / session.previewWidth
-      const full: BrushStroke[] = strokes.current.map((s) => ({
-        mode: s.mode,
-        radius: s.radius * ratio,
-        points: s.points.map((v) => v * ratio)
-      }))
+      const full: EditOp[] = strokes.current.map(({ op }) =>
+        'type' in op && op.type === 'fill'
+          ? { ...op, x: op.x * ratio, y: op.y * ratio }
+          : { mode: (op as PStroke).mode, radius: (op as PStroke).radius * ratio, points: (op as PStroke).points.map((v) => v * ratio) }
+      )
       const result = await window.api.saveMaskEdit(item, options, full, outputPath)
       onSaved(result)
     } catch (e) {
@@ -367,6 +515,7 @@ export default function MaskEditor({
     }
   }
 
+  useEffect(clearHover, [tool, tolerance, contiguous, colorSource, feather, highlight, picking])
   const changed = history.undo > 0
 
   return (
@@ -377,7 +526,7 @@ export default function MaskEditor({
       footer={
         <>
           <span className="muted small">
-            {t('E — стереть · R — вернуть · [ ] — размер кисти · колесо — масштаб · пробел или правая кнопка — двигать')}
+            {t('E — стереть · R — вернуть · G — заливка · [ ] — размер кисти или допуск · колесо — масштаб · пробел или правая кнопка — двигать')}
           </span>
           <button className="btn ghost" onClick={onClose} disabled={saving}>
             {t('Отмена')}
@@ -402,8 +551,52 @@ export default function MaskEditor({
           >
             {t('Вернуть')}
           </button>
+          <button className={`chip ${tool === 'fill' ? 'active' : ''}`} onClick={() => setTool('fill')}>
+            {t('Заливка')}
+          </button>
         </div>
-        <label className="editor-size">
+        {tool === 'fill' ? (
+          <div className="fill-options">
+            <label className="editor-size">
+              {t('Допуск')}
+              <input type="range" min={1} max={100} value={tolerance} onChange={(e) => setTolerance(Number(e.target.value))} />
+              <b>{tolerance}</b>
+            </label>
+            <div className="chips">
+              <button className={`chip ${contiguous ? 'active' : ''}`} onClick={() => setContiguous(true)}>
+                {t('Смежные')}
+              </button>
+              <button className={`chip ${!contiguous ? 'active' : ''}`} onClick={() => setContiguous(false)}>
+                {t('Везде')}
+              </button>
+            </div>
+            <div className="chips">
+              <button className={`chip ${colorSource === 'cursor' ? 'active' : ''}`} onClick={() => setColorSource('cursor')}>
+                {t('Цвет под курсором')}
+              </button>
+              <button
+                className={`chip ${colorSource === 'pipette' ? 'active' : ''}`}
+                onClick={() => (pipette ? setColorSource('pipette') : setPicking(true))}
+              >
+                {t('Из пипетки')}
+                {pipette && <i className="swatch" style={{ background: `rgb(${pipette.join(',')})` }} />}
+              </button>
+              <button className={`chip ${picking ? 'active' : ''}`} onClick={() => setPicking((p) => !p)}>
+                {picking ? t('Кликните по цвету…') : t('Взять цвет')}
+              </button>
+            </div>
+            <label className="editor-size">
+              {t('Мягкость краёв')}
+              <input type="range" min={0} max={100} value={feather} onChange={(e) => setFeather(Number(e.target.value))} />
+              <b>{feather}</b>
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={highlight} onChange={(e) => setHighlight(e.target.checked)} />
+              <span>{t('Подсвечивать область')}</span>
+            </label>
+          </div>
+        ) : null}
+        <label className="editor-size" style={{ display: tool === 'fill' ? 'none' : undefined }}>
           {t('Кисть')}
           <input
             type="range"
@@ -434,11 +627,14 @@ export default function MaskEditor({
       <div
         ref={stageRef}
         className="editor-stage checker"
-        style={{ cursor: spaceDown.current ? 'grab' : 'none' }}
+        style={{ cursor: spaceDown.current ? 'grab' : tool === 'fill' ? 'crosshair' : 'none' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={() => setCursor(null)}
+        onPointerLeave={() => {
+          setCursor(null)
+          clearHover()
+        }}
         onContextMenu={(e) => e.preventDefault()}
         onWheel={onWheel}
       >
@@ -452,7 +648,7 @@ export default function MaskEditor({
             visibility: session ? 'visible' : 'hidden'
           }}
         />
-        {cursor && session && (
+        {cursor && session && tool !== 'fill' && (
           <div
             className={`brush-cursor ${tool}`}
             style={{

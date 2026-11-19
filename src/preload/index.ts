@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { MorphioApi, GifProgress, JobProgress, ModelDownloadProgress, ModuleProgress } from '@shared/types'
+import type { MorphioApi, GifProgress, JobProgress, ModelDownloadProgress, ModuleProgress, MontageProgress } from '@shared/types'
 
 const api: MorphioApi = {
   watchStatus: () => ipcRenderer.invoke('watch:status'),
@@ -38,14 +38,28 @@ const api: MorphioApi = {
   extractVideoFrames: (options) => ipcRenderer.invoke('video:extract', options),
   inspectFrames: (paths) => ipcRenderer.invoke('gif:inspect', paths),
   buildGif: (frames, options) => ipcRenderer.invoke('gif:build', frames, options),
-  exportFrames: (frames, outputDir) => ipcRenderer.invoke('gif:export', frames, outputDir),
+  stickerImage: (path, maxSide) => ipcRenderer.invoke('gif:sticker', path, maxSide),
+  exportFrames: (frames, outputDir, extra) => ipcRenderer.invoke('gif:export', frames, outputDir, extra),
   onGifProgress: (callback) => {
     const listener = (_: unknown, p: GifProgress): void => callback(p)
     ipcRenderer.on('gif:progress', listener)
     return () => ipcRenderer.removeListener('gif:progress', listener)
   },
-  runPipeline: (items, config) => ipcRenderer.invoke('pipeline:start', items, config),
+  runChain: (items, config) => ipcRenderer.invoke('chain:start', items, config),
   previewImage: (path, maxSide) => ipcRenderer.invoke('files:preview', path, maxSide),
+  montagePickVideos: () => ipcRenderer.invoke('montage:pick-videos'),
+  montagePickSubtitles: () => ipcRenderer.invoke('montage:pick-subs'),
+  montageInspect: (paths) => ipcRenderer.invoke('montage:inspect', paths),
+  montageSilence: (path, noiseDb, minSilence) => ipcRenderer.invoke('montage:silence', path, noiseDb, minSilence),
+  montageStrip: (path, count, height) => ipcRenderer.invoke('montage:strip', path, count, height),
+  montageRun: (plan) => ipcRenderer.invoke('montage:run', plan),
+  onMontageProgress: (callback) => {
+    const listener = (_: unknown, p: MontageProgress): void => callback(p)
+    ipcRenderer.on('montage:progress', listener)
+    return () => ipcRenderer.removeListener('montage:progress', listener)
+  },
+  subtitlesLoad: (path) => ipcRenderer.invoke('subs:load', path),
+  subtitlesSave: (path, cues) => ipcRenderer.invoke('subs:save', path, cues),
   compare: (inputPath, outputPath, time) => ipcRenderer.invoke('compare:pair', inputPath, outputPath, time),
   openMaskEditor: (item, options) => ipcRenderer.invoke('bg:edit-open', item, options),
   saveMaskEdit: (item, options, strokes, outputPath) =>

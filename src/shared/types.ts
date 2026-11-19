@@ -26,7 +26,11 @@ export const INPUT_IMAGE_EXTENSIONS = [
 ]
 
 /** Вид файла: по нему реестр форматов решает, во что его можно превратить. */
-export type FileKind = 'image' | 'video' | 'audio' | 'table' | 'archive' | 'pdf' | 'document' | 'folder' | 'other'
+import type { ChainConfig } from './chains'
+import type { LayerAnim } from './layerAnim'
+import type { Cue } from './subtitles'
+
+export type FileKind = 'image' | 'video' | 'audio' | 'table' | 'archive' | 'pdf' | 'document' | 'subtitle' | 'folder' | 'other'
 
 export const TABLE_EXTENSIONS = ['csv', 'tsv', 'xlsx', 'json', 'xml', 'yaml', 'yml']
 export const PDF_EXTENSIONS = ['pdf']
@@ -49,6 +53,8 @@ export interface FileItem {
   kind?: FileKind
   /** Есть ли в файле звуковая дорожка */
   hasAudio?: boolean
+  /** Для видео: сколько в нём дорожек субтитров */
+  subtitleTracks?: number
 }
 
 export interface ConvertOptions {
@@ -151,6 +157,23 @@ export interface BrushStroke {
   /** [x0, y0, x1, y1, ...] */
   points: number[]
 }
+
+/** Заливка областью по цвету (инструмент «Заливка»): координаты в пикселях изображения. */
+export interface FillOp {
+  type: 'fill'
+  x: number
+  y: number
+  /** Допуск, ΔE в Lab (1–100) */
+  tolerance: number
+  contiguous: boolean
+  /** Опорный цвет; не задан — цвет под точкой клика */
+  color?: [number, number, number]
+  /** Мягкость краёв, 0–1 */
+  feather: number
+}
+
+/** Правка маски: мазок кисти или заливка. Порядок правок важен, поэтому хранится последовательность. */
+export type EditOp = BrushStroke | FillOp
 
 export interface MaskEditSession {
   /** Размер исходного изображения */
@@ -261,6 +284,103 @@ export interface MediaOptions {
   outputDir?: string
 }
 
+/** Клип в плане монтажа: файл и отрезок, который берём. */
+export interface MontageClip {
+  id: string
+  path: string
+  name: string
+  duration: number
+  width: number
+  height: number
+  fps: number
+  hasAudio: boolean
+  audioTracks: number
+  vcodec?: string
+  acodec?: string
+  audioRate?: number
+  thumbnail?: string
+  /** Метка поворота в файле (градусы против часовой, как в FFmpeg); у телефонных роликов −90 или 90 */
+  rotation?: number
+  /** Начало и конец отрезка, секунды; не заданы — клип целиком */
+  start?: number
+  end?: number
+}
+
+export interface MontageCrop {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export const MONTAGE_TRANSITIONS = ['fade', 'dissolve', 'wipeleft', 'wiperight', 'slideleft', 'slideright', 'circleopen', 'fadeblack'] as const
+export type MontageTransition = (typeof MONTAGE_TRANSITIONS)[number]
+
+export interface MontagePlan {
+  clips: MontageClip[]
+  /** Быстро: без перекодирования, граница по ключевым кадрам. Точно: кадр в кадр. */
+  trimMode: 'fast' | 'accurate'
+  rotate: 0 | 90 | 180 | 270
+  flipH: boolean
+  flipV: boolean
+  /** Скорость: 1 — как есть, 2 — вдвое быстрее */
+  speed: number
+  mute: boolean
+  /** Номер звуковой дорожки (с нуля) */
+  audioTrack: number
+  loudness: { mode: 'off' | 'loudnorm' | 'dynaudnorm'; target: number }
+  subtitles: {
+    mode: 'none' | 'soft' | 'burn'
+    path?: string
+    /** Сдвиг времени субтитров, секунды (минус — раньше) */
+    shift: number
+    fontSize: number
+    /** Цвет текста, #rrggbb */
+    color: string
+    outline: boolean
+  }
+  /** Кадрирование рамкой: доли кадра от 0 до 1 (левый верхний угол и размеры) */
+  crop?: MontageCrop
+  /** Переход между клипами: плавный вместо резкой склейки */
+  transition?: { kind: MontageTransition; duration: number }
+  /** Привести кадр к соотношению сторон: обрезать лишнее или добавить поля */
+  fit?: { aspect: '9:16' | '1:1' | '16:9' | '4:5'; mode: 'crop' | 'pad' }
+  target: VideoTarget
+  quality: 'high' | 'medium' | 'low'
+  maxHeight?: number
+  /** Уложиться в размер файла, МБ: битрейт и разрешение подбираются сами */
+  targetMB?: number
+  audioBitrate: number
+  useGpu: boolean
+  outputDir?: string
+  /** Имя результата без расширения (по умолчанию «имя-edited») */
+  outputName?: string
+}
+
+export function defaultMontagePlan(): MontagePlan {
+  return {
+    clips: [],
+    trimMode: 'accurate',
+    rotate: 0,
+    flipH: false,
+    flipV: false,
+    speed: 1,
+    mute: false,
+    audioTrack: 0,
+    loudness: { mode: 'off', target: -16 },
+    subtitles: { mode: 'none', shift: 0, fontSize: 24, color: '#ffffff', outline: true },
+    target: 'mp4',
+    quality: 'medium',
+    audioBitrate: 192,
+    useGpu: true
+  }
+}
+
+export interface MontageProgress {
+  percent: number
+  text?: string
+}
+
 /** Видеоформаты, которые можно превратить в анимацию. */
 export const VIDEO_EXTENSIONS = [
   'mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v', 'wmv', 'flv', 'mpg', 'mpeg', 'ts', 'mts', 'm2ts', '3gp'
@@ -303,8 +423,69 @@ export function orderFrames<T>(frames: T[], order: 'normal' | 'reverse' | 'pingp
   return frames
 }
 
+/** Слой поверх анимации: текст или стикер. Картинку слоя рисует окно (там есть все шрифты Windows). */
+export interface GifLayer {
+  id: string
+  kind: 'text' | 'sticker'
+  /** PNG слоя (data URL); размер считается для кадра шириной 1000 px */
+  png: string
+  /** Центр слоя: доли ширины и высоты кадра (0–1) */
+  x: number
+  y: number
+  /** Ширина слоя: доля ширины кадра */
+  w: number
+  /** Поворот, градусы */
+  rotation: number
+  /** Показывать с кадра … по кадр … (номера кадров в списке, с нуля, включительно); не заданы — всегда */
+  from?: number
+  to?: number
+  /** Непрозрачность, 0–1 */
+  opacity?: number
+  /** Анимация слоя за время показа */
+  anim?: LayerAnim
+  /** Только для окна: исходные настройки, чтобы слой можно было править */
+  edit?: Record<string, unknown>
+}
+
+/** Рамка обрезки в долях кадра. */
+export interface GifCrop {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface GifBgRemoval {
+  method: 'auto' | 'solid' | 'ai'
+  /** Для GIF: цвет, на который «подмешиваются» края, чтобы не было светлой каймы */
+  matte: string
+  /** Сгладить маску по времени, чтобы края не мерцали (для нейросети) */
+  smooth: boolean
+}
+
+/** Часть кадров с другой скоростью: 2 — вдвое быстрее, 0.5 — вдвое медленнее. */
+export interface GifSpeedRange {
+  from: number
+  to: number
+  factor: number
+}
+
+/** Скорость, которая применяется к кадру с таким номером (первый подходящий диапазон). */
+export function speedFor(ranges: GifSpeedRange[] | undefined, index: number): number {
+  const r = ranges?.find((x) => index >= x.from && index <= x.to && x.factor > 0)
+  return r ? r.factor : 1
+}
+
 export interface GifBuildOptions {
-  format: 'gif' | 'webp'
+  format: 'gif' | 'webp' | 'apng'
+  /** Обрезка рамкой: применяется ко всем кадрам */
+  crop?: GifCrop
+  /** Текст и стикеры поверх анимации */
+  layers?: GifLayer[]
+  /** Удалить фон у всех кадров (прозрачная анимация) */
+  removeBg?: GifBgRemoval
+  /** Ускорить или замедлить часть кадров: номера кадров в списке (с нуля, включительно) */
+  speedRanges?: GifSpeedRange[]
   /** Ширина результата в пикселях; не задана = как у первого кадра (не больше 1200) */
   width?: number
   fit: 'contain' | 'cover'
@@ -408,6 +589,8 @@ export interface SettingsState {
 /** Модуль, который докачивается по кнопке (Pandoc и другие) */
 export interface ModuleInfo {
   id: string
+  /** Программа или модель (нейросеть, язык) */
+  group: 'tool' | 'model'
   name: string
   version: string
   description: string
@@ -430,8 +613,8 @@ export interface UniversalTarget {
   /** engine:формат, например image:webp, table:xlsx, archive:unpack */
   id: string
   label: string
-  /** Раздел в списке вариантов */
-  group: FileKind
+  /** Раздел в списке вариантов (ai — нейросети) */
+  group: FileKind | 'ai'
   hint: string
   /** Нужен модуль (например pandoc) */
   needs?: string
@@ -456,6 +639,14 @@ export interface UniversalOptions {
   keepMetadata?: boolean
   /** Видео и звук: подробные настройки (не заданы — значения по умолчанию) */
   media?: UniversalMedia
+  /** Нейросети: язык распознавания текста («rus+eng») или речи («ru», «auto») */
+  lang?: string
+  /** Нейросети: модель речи (tiny, base, small) */
+  aiModel?: string
+  /** Субтитры: сдвиг времени, секунды (минус — раньше) */
+  shift?: number
+  /** Субтитры из видео: номер дорожки с нуля */
+  subTrack?: number
 }
 
 export interface UniversalMedia {
@@ -507,16 +698,30 @@ export interface MorphioApi {
   extractVideoFrames(options: VideoExtractOptions): Promise<VideoExtractResult>
   inspectFrames(paths: string[]): Promise<GifFrame[]>
   buildGif(frames: GifFrame[], options: GifBuildOptions): Promise<GifResult>
-  exportFrames(frames: GifFrame[], outputDir: string): Promise<{ dir: string; count: number }>
+  /** Картинка файла для стикера (до maxSide, с прозрачностью) */
+  stickerImage(path: string, maxSide: number): Promise<ImagePreview>
+  exportFrames(frames: GifFrame[], outputDir: string, extra?: { crop?: GifCrop; layers?: GifLayer[] }): Promise<{ dir: string; count: number }>
   onGifProgress(callback: (progress: GifProgress) => void): () => void
-  runPipeline(items: FileItem[], config: PipelineConfig): Promise<void>
+  runChain(items: FileItem[], config: ChainConfig): Promise<void>
   previewImage(path: string, maxSide: number): Promise<ImagePreview>
+  montagePickVideos(): Promise<string[]>
+  montagePickSubtitles(): Promise<string | undefined>
+  montageInspect(paths: string[]): Promise<MontageClip[]>
+  /** Лента кадров: одна картинка с равными кадрами по длине ролика */
+  montageStrip(path: string, count: number, height: number): Promise<string>
+  /** Паузы в звуке ролика: отрезки тишины, секунды */
+  montageSilence(path: string, noiseDb: number, minSilence: number): Promise<{ start: number; end: number }[]>
+  montageRun(plan: MontagePlan): Promise<SavedResult>
+  onMontageProgress(callback: (progress: MontageProgress) => void): () => void
+  /** Редактор субтитров: прочитать реплики файла и сохранить правки */
+  subtitlesLoad(path: string): Promise<Cue[]>
+  subtitlesSave(path: string, cues: Cue[]): Promise<void>
   compare(inputPath: string, outputPath: string, time?: number): Promise<CompareResult>
   openMaskEditor(item: FileItem, options: BgRemoveOptions): Promise<MaskEditSession>
   saveMaskEdit(
     item: FileItem,
     options: BgRemoveOptions,
-    strokes: BrushStroke[],
+    strokes: EditOp[],
     outputPath: string
   ): Promise<SavedResult>
   cancel(): Promise<void>

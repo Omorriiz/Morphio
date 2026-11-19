@@ -10,21 +10,25 @@ import type {
 import { useFileJobs } from '../hooks/useFileJobs'
 import FileList from '../components/FileList'
 import CompareModal from '../components/CompareModal'
+import SubtitleEditor from '../components/SubtitleEditor'
 import ModuleDownload from '../components/ModuleDownload'
 import { useModules } from '../hooks/useModules'
 import DropOverlay from '../components/DropOverlay'
 import { Field, Section, Segmented, Switch } from '../components/ui'
 import { useI18n } from '../i18n'
 import { formatBytes } from '../lib'
-import { MEDIA_PRESETS } from '../mediaPresets'
+import { MEDIA_PRESETS } from '@shared/mediaPresets'
+import { estimateSpeechSeconds, formatEstimate, mixRatio } from '@shared/speechEstimate'
 
-const GROUPS: { id: FileKind; title: string }[] = [
+const GROUPS: { id: UniversalTarget['group']; title: string }[] = [
   { id: 'image', title: 'Изображения' },
   { id: 'video', title: 'Видео' },
   { id: 'audio', title: 'Только звук' },
   { id: 'table', title: 'Таблицы и данные' },
   { id: 'pdf', title: 'PDF' },
   { id: 'document', title: 'Документы и книги' },
+  { id: 'subtitle', title: 'Субтитры' },
+  { id: 'ai', title: 'Нейросети' },
   { id: 'archive', title: 'Запаковать или распаковать' }
 ]
 
@@ -35,7 +39,41 @@ const SUPPORTED: { icon: string; label: string; hint: string }[] = [
   { icon: '📊', label: 'Таблицы', hint: 'CSV · XLSX · JSON · XML · YAML' },
   { icon: '📚', label: 'Документы', hint: 'DOCX · ODT · RTF · HTML · Markdown · TXT · EPUB · FB2 · PDF' },
   { icon: '📄', label: 'PDF', hint: 'PDF в текст и картинки · склейка · разделение · картинки в PDF' },
+  { icon: '💬', label: 'Субтитры', hint: 'SRT · VTT · ASS · TXT · сдвиг времени · дорожка из видео' },
   { icon: '📦', label: 'Архивы', hint: 'ZIP · 7z · TAR' }
+]
+
+const SPEED_KEY = 'morphio.speechRatio.'
+function readRatio(model: string): number | undefined {
+  try {
+    const n = Number(localStorage.getItem(SPEED_KEY + model))
+    return n > 0 ? n : undefined
+  } catch {
+    return undefined
+  }
+}
+function saveRatio(model: string, measured: number): void {
+  try {
+    localStorage.setItem(SPEED_KEY + model, String(mixRatio(readRatio(model), measured)))
+  } catch {
+    /* память браузера недоступна: прикидка останется средней */
+  }
+}
+
+const SPEECH_LANGS: { id: string; native: string }[] = [
+  { id: 'auto', native: 'Определить сам' },
+  { id: 'ru', native: 'Русский' },
+  { id: 'en', native: 'English' },
+  { id: 'uk', native: 'Українська' },
+  { id: 'de', native: 'Deutsch' },
+  { id: 'fr', native: 'Français' },
+  { id: 'es', native: 'Español' },
+  { id: 'it', native: 'Italiano' },
+  { id: 'pt', native: 'Português' },
+  { id: 'pl', native: 'Polski' },
+  { id: 'tr', native: 'Türkçe' },
+  { id: 'zh', native: '中文' },
+  { id: 'ja', native: '日本語' }
 ]
 
 const IMAGE_SIZES: { label: string; value?: number }[] = [
@@ -105,7 +143,13 @@ export default function ConvertView({
   const [delimiter, setDelimiter] = useState<UniversalOptions['csvDelimiter']>(',')
   const [bom, setBom] = useState(true)
   const [outputDir, setOutputDir] = useState<string | undefined>(undefined)
+  const [ocrLang, setOcrLang] = useState('rus+eng')
+  const [speechModel, setSpeechModel] = useState('base')
+  const [speechLang, setSpeechLang] = useState('auto')
+  const [subShift, setSubShift] = useState(0)
+  const [subTrack, setSubTrack] = useState(0)
   const [comparing, setComparing] = useState<{ name: string; input: string; output: string } | null>(null)
+  const [editingSubs, setEditingSubs] = useState<{ name: string; path: string } | null>(null)
 
   useEffect(() => {
     void window.api.mediaCapabilities().then(setCaps)
@@ -139,7 +183,7 @@ export default function ConvertView({
   useEffect(() => {
     job.resetResults()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, quality, maxSize, strip, media, limitOn, limitMB, useGpu, level, password, delimiter, bom, outputDir])
+  }, [target, quality, maxSize, strip, media, limitOn, limitMB, useGpu, level, password, delimiter, bom, outputDir, ocrLang, speechModel, speechLang, subShift, subTrack])
 
   // Выбрали результат: прокручиваем к настройкам, чтобы они были на виду.
   useEffect(() => {
@@ -148,8 +192,22 @@ export default function ConvertView({
 
   const [engine, format] = target.split(':')
   const chosen = targets.find((x) => x.id === target)
-  const needsModule = chosen?.missing ? chosen.needs : undefined
-  const pandocInfo = mods.modules.find((m) => m.id === 'pandoc')
+  const needsCalibre = chosen?.needs === 'calibre' && !!chosen.missing
+  // Какие модули нужны выбранному результату и каких ещё нет (скачиваются по кнопке)
+  const required: string[] = !target
+    ? []
+    : engine === 'doc'
+      ? chosen?.needs === 'pandoc'
+        ? ['pandoc']
+        : []
+      : engine === 'upscale'
+        ? ['upscale']
+        : engine === 'ocr'
+          ? ocrLang.split('+').map((l) => `tess-${l}`)
+          : engine === 'speech'
+            ? ['whisper', `whisper-${speechModel}`]
+            : []
+  const missingMods = required.map((id) => mods.modules.find((m) => m.id === id)).filter((m) => m && !m.installed) as typeof mods.modules
   const imageFormat = engine === 'image' ? IMAGE_FORMATS.find((f) => f.id === format) : undefined
   const audioFormat = engine === 'audio' ? AUDIO_TARGETS.find((a) => a.id === format) : undefined
   const isPack = engine === 'archive' && format !== 'unpack'
@@ -191,7 +249,29 @@ export default function ConvertView({
     if (dir) setOutputDir(dir)
   }
 
-  const start = (): Promise<void> =>
+  // Скорость распознавания на этом компьютере: считаем по готовым файлам, потом прикидка точнее
+  const speechMark = useRef<{ t: number; seen: Set<string> }>({ t: 0, seen: new Set() })
+  useEffect(() => {
+    if (engine !== 'speech') return
+    for (const f of files) {
+      if (progress[f.id]?.status !== 'done' || speechMark.current.seen.has(f.id)) continue
+      speechMark.current.seen.add(f.id)
+      const now = Date.now()
+      if (speechMark.current.t && (f.duration ?? 0) >= 8) saveRatio(speechModel, (now - speechMark.current.t) / 1000 / (f.duration as number))
+      speechMark.current.t = now
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress])
+  const speechSeconds =
+    engine === 'speech'
+      ? files.reduce((s, f) => s + estimateSpeechSeconds(f.duration ?? 0, speechModel, readRatio(speechModel)), 0)
+      : 0
+
+  const start = (): Promise<void> => {
+    speechMark.current = { t: Date.now(), seen: new Set() }
+    return startJob()
+  }
+  const startJob = (): Promise<void> =>
     job.run(async (todo) => {
       await window.api.universalConvert(todo, {
         target,
@@ -202,6 +282,10 @@ export default function ConvertView({
         csvDelimiter: delimiter,
         csvBom: bom,
         maxSize,
+        lang: engine === 'ocr' ? ocrLang : engine === 'speech' ? speechLang : undefined,
+        aiModel: engine === 'speech' ? speechModel : undefined,
+        shift: engine === 'subs' ? subShift : undefined,
+        subTrack: engine === 'subs' ? subTrack : undefined,
         keepMetadata: !strip,
         media: {
           ...media,
@@ -212,7 +296,7 @@ export default function ConvertView({
       })
     })
 
-  const groupTargets = (g: FileKind): UniversalTarget[] => targets.filter((x) => x.group === g)
+  const groupTargets = (g: UniversalTarget['group']): UniversalTarget[] => targets.filter((x) => x.group === g)
 
   return (
     <div className="converter">
@@ -271,6 +355,7 @@ export default function ConvertView({
               onRemove={job.remove}
               compact
               onCompare={(f, p) => setComparing({ name: f.name, input: f.path, output: p.outputPath! })}
+              onEditSubs={(f, p) => setEditingSubs({ name: f.name, path: p.outputPath! })}
             />
 
             <Section title={t('Во что превратить')}>
@@ -335,19 +420,25 @@ export default function ConvertView({
               )}
             </Section>
 
-            {needsModule === 'pandoc' && pandocInfo && (
-              <Section title={t('Нужен дополнительный модуль')}>
+            {missingMods.length > 0 && (
+              <Section title={t('Нужны дополнительные модули')}>
                 <p className="notice warn">
-                  {t('Для документов и книг нужна программа Pandoc ({size} МБ, лицензия {license}). Она скачивается один раз с {source}, после этого всё работает без интернета.', {
-                    size: pandocInfo.sizeMB,
-                    license: pandocInfo.license,
-                    source: pandocInfo.source
-                  })}
+                  {t('Они скачиваются один раз по вашей кнопке, после этого всё работает без интернета.')}
                 </p>
-                <ModuleDownload info={pandocInfo} progress={mods.progress['pandoc']} onInstall={() => void mods.install('pandoc')} />
+                {missingMods.map((m) => (
+                  <div key={m.id} className="module-need">
+                    <div>
+                      <strong>{t(m.name)}</strong>
+                      <div className="muted small">
+                        {t('Лицензия {license}, источник {source}, {size} МБ', { license: m.license, source: m.source, size: m.sizeMB })}
+                      </div>
+                    </div>
+                    <ModuleDownload info={m} progress={mods.progress[m.id]} onInstall={() => void mods.install(m.id)} />
+                  </div>
+                ))}
               </Section>
             )}
-            {needsModule === 'calibre' && (
+            {needsCalibre && (
               <p className="notice warn">
                 {t('MOBI и AZW3 создаёт и читает только бесплатная программа Calibre. Установите её с calibre-ebook.com, и эти варианты заработают.')}
               </p>
@@ -468,6 +559,80 @@ export default function ConvertView({
                       </Field>
                     )}
 
+                  {engine === 'subs' && (
+                    <>
+                      <Field label={t('Сдвиг, секунды')} hint={t('Минус — раньше, плюс — позже. Ноль — без сдвига')}>
+                        <input
+                          type="number"
+                          className="text-input"
+                          step={0.1}
+                          value={subShift}
+                          disabled={running}
+                          onChange={(e) => setSubShift(Number(e.target.value) || 0)}
+                        />
+                      </Field>
+                      {files.some((f) => (f.subtitleTracks ?? 0) > 1) && (
+                        <Field label={t('Дорожка субтитров')}>
+                          <select value={subTrack} disabled={running} onChange={(e) => setSubTrack(Number(e.target.value))}>
+                            {Array.from({ length: Math.max(...files.map((f) => f.subtitleTracks ?? 0)) }, (_, k) => (
+                              <option key={k} value={k}>
+                                {t('Дорожка {n}', { n: k + 1 })}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      )}
+                    </>
+                  )}
+                  {engine === 'ocr' && (
+                    <Field label={t('Язык текста')} hint={t('Нужен модуль языка: он скачивается кнопкой выше')}>
+                      <Segmented
+                        value={ocrLang}
+                        disabled={running}
+                        onChange={setOcrLang}
+                        options={[
+                          { id: 'rus+eng', label: t('Русский и English') },
+                          { id: 'rus', label: t('Русский') },
+                          { id: 'eng', label: 'English' }
+                        ]}
+                      />
+                    </Field>
+                  )}
+                  {engine === 'speech' && (
+                    <>
+                      <Field label={t('Модель')} hint={t('Чем точнее модель, тем дольше работа и больше файл модели')}>
+                        <Segmented
+                          value={speechModel}
+                          disabled={running}
+                          onChange={setSpeechModel}
+                          options={[
+                            { id: 'tiny', label: t('Быстрая'), hint: t('78 МБ, с ошибками в сложной речи') },
+                            { id: 'base', label: t('Обычная'), hint: t('148 МБ, хороший баланс') },
+                            { id: 'small', label: t('Точная'), hint: t('488 МБ, лучше для русского') }
+                          ]}
+                        />
+                      </Field>
+                      {speechSeconds > 0 && (
+                        <Field label={t('Сколько займёт')} hint={readRatio(speechModel) ? t('По скорости вашего компьютера') : t('Грубая прикидка: после первого запуска станет точнее')}>
+                          <span>
+                            {(() => {
+                              const e = formatEstimate(speechSeconds)
+                              return e.unit === 's' ? t('около {n} с', { n: e.a }) : e.unit === 'm' ? t('около {n} мин', { n: e.a }) : t('около {h} ч {m} мин', { h: e.a, m: e.b ?? 0 })
+                            })()}
+                          </span>
+                        </Field>
+                      )}
+                      <Field label={t('Язык речи')}>
+                        <select value={speechLang} disabled={running} onChange={(e) => setSpeechLang(e.target.value)}>
+                          {SPEECH_LANGS.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.id === 'auto' ? t('Определить сам') : l.native}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    </>
+                  )}
                   {target === 'table:csv' && (
                     <>
                       <Field label={t('Разделитель')}>
@@ -625,7 +790,7 @@ export default function ConvertView({
                 {t('Остановить')}
               </button>
             ) : (
-              <button className="btn primary" onClick={start} disabled={allDone || !target || !!needsModule}>
+              <button className="btn primary" onClick={start} disabled={allDone || !target || missingMods.length > 0 || needsCalibre}>
                 {allDone
                   ? t('Готово')
                   : !target
@@ -636,6 +801,7 @@ export default function ConvertView({
           </footer>
         </>
       )}
+      {editingSubs && <SubtitleEditor title={`${t('Субтитры')}: ${editingSubs.name}`} path={editingSubs.path} onClose={() => setEditingSubs(null)} />}
       {comparing && (
         <CompareModal
           title={`${t('До и после')}: ${comparing.name}`}

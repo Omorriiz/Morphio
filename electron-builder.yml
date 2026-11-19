@@ -26,6 +26,21 @@ asarUnpack:
   # PDF: отрисовка страниц (нативный холст) и данные шрифтов читаются как обычные файлы
   - node_modules/@napi-rs/**/*
   - node_modules/pdfjs-dist/**/*
+  # Распознавание текста: рабочий поток и WASM-ядро запускаются как обычные файлы
+  - node_modules/tesseract.js/**/*
+  - node_modules/tesseract.js-core/**/*
+  # рабочий поток Tesseract запускается из папки unpacked и ищет свои зависимости рядом
+  - node_modules/bmp-js/**/*
+  - node_modules/idb-keyval/**/*
+  - node_modules/is-url/**/*
+  - node_modules/node-fetch/**/*
+  - node_modules/whatwg-url/**/*
+  - node_modules/tr46/**/*
+  - node_modules/webidl-conversions/**/*
+  - node_modules/opencollective-postinstall/**/*
+  - node_modules/regenerator-runtime/**/*
+  - node_modules/wasm-feature-detect/**/*
+  - node_modules/zlibjs/**/*
 win:
   icon: build/icon.ico
   target:

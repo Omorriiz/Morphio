@@ -5,6 +5,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    // Два входа: само приложение и лёгкая командная строка (запускается как Node, без окон и Chromium)
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          cli: resolve('src/main/cli-node.ts')
+        }
+      }
+    },
     resolve: { alias: { '@shared': resolve('src/shared') } }
   },
   preload: {

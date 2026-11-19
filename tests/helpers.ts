@@ -1,4 +1,4 @@
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -62,4 +62,36 @@ export async function makeImage(
   else img = img.png()
   await img.toFile(path)
   return path
+}
+
+/**
+ * Ставит модули из папки models-release в временную папку без скачивания (то же, что делает кнопка «Скачать»).
+ * Возвращает false, если файлов релиза нет: такие тесты пропускаются.
+ */
+export async function installFromRelease(ids: string[]): Promise<boolean> {
+  const { spawnSync } = await import('node:child_process')
+  const { path7za } = await import('7zip-bin')
+  const { MODULES, configureModules } = await import('../src/main/modules')
+  const release = join(process.cwd(), 'models-release')
+  if (!(await exists(release))) return false
+  const root = await tmpDir('modules')
+  for (const id of ids) {
+    const m = MODULES.find((x) => x.id === id)!
+    const dir = join(root, m.id, m.version)
+    await fs.mkdir(dir, { recursive: true })
+    for (const f of m.files) {
+      const src = join(release, f.name)
+      if (!(await exists(src))) return false
+      if (f.unzip) spawnSync(path7za, ['x', src, `-o${dir}`, '-y', '-bd'], { windowsHide: true })
+      else await fs.copyFile(src, join(dir, f.saveAs ?? f.name))
+    }
+    await fs.writeFile(join(dir, '.ok'), 'test')
+  }
+  configureModules([root])
+  return true
+}
+
+/** Есть ли в папке models-release файлы, нужные модулям (для skipIf). */
+export function releaseHas(...names: string[]): boolean {
+  return names.every((n) => existsSync(join(process.cwd(), 'models-release', n)))
 }
