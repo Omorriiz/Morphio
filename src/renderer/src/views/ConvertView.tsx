@@ -7,6 +7,7 @@ import type {
   UniversalOptions,
   UniversalTarget
 } from '@shared/types'
+import { usePersistentState } from '../uiStore'
 import { useFileJobs } from '../hooks/useFileJobs'
 import FileList from '../components/FileList'
 import CompareModal from '../components/CompareModal'
@@ -131,21 +132,21 @@ export default function ConvertView({
   const [preset, setPreset] = useState<string | null>(null)
   const [caps, setCaps] = useState<MediaCapabilities | null>(null)
 
-  const [quality, setQuality] = useState(85)
-  const [maxSize, setMaxSize] = useState<number | undefined>(undefined)
-  const [strip, setStrip] = useState(true)
-  const [media, setMedia] = useState<UniversalMedia>(DEFAULT_MEDIA)
-  const [limitOn, setLimitOn] = useState(false)
-  const [limitMB, setLimitMB] = useState(10)
-  const [useGpu, setUseGpu] = useState(true)
-  const [level, setLevel] = useState<UniversalOptions['archiveLevel']>('normal')
+  const [quality, setQuality] = usePersistentState('convert.quality', 85)
+  const [maxSize, setMaxSize] = usePersistentState<number | undefined>('convert.maxSize', undefined)
+  const [strip, setStrip] = usePersistentState('convert.strip', true)
+  const [media, setMedia] = usePersistentState<UniversalMedia>('convert.media', DEFAULT_MEDIA)
+  const [limitOn, setLimitOn] = usePersistentState('convert.limitOn', false)
+  const [limitMB, setLimitMB] = usePersistentState('convert.limitMB', 10)
+  const [useGpu, setUseGpu] = usePersistentState('convert.useGpu', true)
+  const [level, setLevel] = usePersistentState<UniversalOptions['archiveLevel']>('convert.level', 'normal')
   const [password, setPassword] = useState('')
-  const [delimiter, setDelimiter] = useState<UniversalOptions['csvDelimiter']>(',')
-  const [bom, setBom] = useState(true)
-  const [outputDir, setOutputDir] = useState<string | undefined>(undefined)
-  const [ocrLang, setOcrLang] = useState('rus+eng')
-  const [speechModel, setSpeechModel] = useState('base')
-  const [speechLang, setSpeechLang] = useState('auto')
+  const [delimiter, setDelimiter] = usePersistentState<UniversalOptions['csvDelimiter']>('convert.delimiter', ',')
+  const [bom, setBom] = usePersistentState('convert.bom', true)
+  const [outputDir, setOutputDir] = usePersistentState<string | undefined>('convert.outputDir', undefined)
+  const [ocrLang, setOcrLang] = usePersistentState('convert.ocrLang', 'rus+eng')
+  const [speechModel, setSpeechModel] = usePersistentState('convert.speechModel', 'base')
+  const [speechLang, setSpeechLang] = usePersistentState('convert.speechLang', 'auto')
   const [subShift, setSubShift] = useState(0)
   const [subTrack, setSubTrack] = useState(0)
   const [comparing, setComparing] = useState<{ name: string; input: string; output: string } | null>(null)

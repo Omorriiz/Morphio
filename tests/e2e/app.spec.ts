@@ -473,8 +473,7 @@ test.describe('настройки и фоновый режим', () => {
     await page.locator('.settings-btn').click()
     const toggle = page.locator('.check', { hasText: 'quick window with a keyboard shortcut' }).locator('input')
     await toggle.check()
-    await expect.poll(async () => (await settings()).quickEnabled).toBe(true)
-    expect(await settings()).toMatchObject({ tray: true, closeToTray: true })
+    await expect.poll(async () => await settings()).toMatchObject({ quickEnabled: true, tray: true, closeToTray: true })
     await expect(page.locator('.check', { hasText: 'Icon in the notification area' }).locator('input')).toBeChecked()
   })
 

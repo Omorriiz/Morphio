@@ -5,7 +5,7 @@
   "description": "Локальный конвертер форматов, удаление фона и GIF-студия для Windows",
   "main": "./out/main/index.js",
   "author": "Morphio",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
@@ -26,6 +26,7 @@
     "@napi-rs/canvas": "^1.1.1",
     "7zip-bin": "^5.2.0",
     "chokidar": "^6.0.0",
+    "electron-updater": "^6.8.11",
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.12.0",
     "ffmpeg-static": "^5.3.0",

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { MorphioApi, GifProgress, JobProgress, ModelDownloadProgress, ModuleProgress, MontageProgress } from '@shared/types'
+import type { MorphioApi, GifProgress, JobProgress, ModelDownloadProgress, ModuleProgress, MontageProgress, UpdateState } from '@shared/types'
 
 const api: MorphioApi = {
   watchStatus: () => ipcRenderer.invoke('watch:status'),
@@ -26,6 +26,21 @@ const api: MorphioApi = {
   universalConvert: (items, options) => ipcRenderer.invoke('any:convert', items, options),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   patchSettings: (patch) => ipcRenderer.invoke('settings:patch', patch),
+  resetSettings: () => ipcRenderer.invoke('settings:reset'),
+  openDataFolder: () => ipcRenderer.invoke('app:open-data'),
+  openLogsFolder: () => ipcRenderer.invoke('log:open-folder'),
+  logRendererError: (message, stack) => ipcRenderer.invoke('log:renderer-error', message, stack),
+  updatesState: () => ipcRenderer.invoke('updates:state'),
+  updatesCheck: () => ipcRenderer.invoke('updates:check'),
+  updatesDownload: () => ipcRenderer.invoke('updates:download'),
+  updatesInstall: () => ipcRenderer.invoke('updates:install'),
+  updatesDismiss: () => ipcRenderer.invoke('updates:dismiss'),
+  onUpdateState: (cb) => {
+    const h = (_: unknown, s: UpdateState): void => cb(s)
+    ipcRenderer.on('updates:state-changed', h)
+    return () => ipcRenderer.removeListener('updates:state-changed', h)
+  },
+  reportProblem: (note) => ipcRenderer.invoke('log:report', note),
   getPathForFile: (file) => webUtils.getPathForFile(file),
   pickFiles: () => ipcRenderer.invoke('files:pick'),
   pickFolder: () => ipcRenderer.invoke('folder:pick'),

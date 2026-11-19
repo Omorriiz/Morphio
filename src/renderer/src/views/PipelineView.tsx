@@ -4,6 +4,7 @@ import type { BgMethod, FileKind } from '@shared/types'
 import { AUDIO_TAG_KEYS, defaultAudioBranch, defaultChain, defaultVideoBranch, migratePresets } from '@shared/chains'
 import type { AudioBranch, ChainPreset, ImageBranch, VideoBranch } from '@shared/chains'
 import { BUILTIN_CHAINS as BUILTIN } from '@shared/chainPresets'
+import { readUi, writeUi } from '../uiStore'
 import { useFileJobs } from '../hooks/useFileJobs'
 import FileList from '../components/FileList'
 import DropOverlay from '../components/DropOverlay'
@@ -13,23 +14,27 @@ import { Field, Section, Segmented, Switch } from '../components/ui'
 
 const STORE_KEY = 'morphio.chains'
 const OLD_STORE_KEY = 'morphio.pipelines'
+const UI_KEY = 'chains'
 
-/** Свои цепочки лежат в хранилище окна; цепочки старого формата (только картинки) открываются как раньше. */
+/**
+ * Свои цепочки лежат в settings.json (переживают переустановку и переезд). Если там пусто, один раз забираем
+ * цепочки из старого хранилища окна. Цепочки старого формата (только картинки) открываются как раньше.
+ */
 function loadUserPresets(): ChainPreset[] {
+  const saved = readUi<unknown>(UI_KEY, null)
+  if (Array.isArray(saved)) return migratePresets(saved)
   try {
     const raw = localStorage.getItem(STORE_KEY) ?? localStorage.getItem(OLD_STORE_KEY)
-    return raw ? migratePresets(JSON.parse(raw)) : []
+    const list = raw ? migratePresets(JSON.parse(raw)) : []
+    if (list.length > 0) writeUi(UI_KEY, list)
+    return list
   } catch {
     return []
   }
 }
 
 function saveUserPresets(list: ChainPreset[]): void {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(list))
-  } catch {
-    /* хранилище недоступно — цепочки просто не сохранятся */
-  }
+  writeUi(UI_KEY, list)
 }
 
 const SIZES: { label: string; value?: number }[] = [

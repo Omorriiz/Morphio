@@ -571,9 +571,44 @@ export interface AppSettings {
   /** Последние выбранные варианты в быстром окне (первыми показываются они) */
   quickLast: string[]
   watchRules: WatchRule[]
+  /** Размер и положение главного окна (последнее закрытие) */
+  window?: WindowState
+  /** Запоминаемые значения экранов: формат, качество, папки, свои цепочки и т. п. (ключ → значение) */
+  ui: Record<string, unknown>
+  /** Проверять обновления на GitHub (по умолчанию выключено: приложение работает офлайн) */
+  checkUpdates: boolean
+  /** Когда последний раз проверяли (мс с 1970) */
+  lastUpdateCheck: number
+}
+
+export interface WindowState {
+  width: number
+  height: number
+  x?: number
+  y?: number
+  maximized: boolean
 }
 
 export const DEFAULT_HOTKEY = 'CommandOrControl+Shift+X'
+
+/** Максимальный размер запоминаемых значений экранов в настройках (байты JSON). */
+export const UI_STORE_LIMIT = 400_000
+
+/** Состояние обновления для окна. */
+export interface UpdateState {
+  status: 'idle' | 'unsupported' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error'
+  version?: string
+  /** Что нового (простой текст) */
+  notes?: string
+  percent?: number
+  error?: string
+}
+
+export interface ProblemReport {
+  url: string
+  /** Полный текст отчёта не поместился в адрес и скопирован в буфер обмена */
+  copied: boolean
+}
 
 export interface SettingsState {
   settings: AppSettings
@@ -685,6 +720,21 @@ export interface MorphioApi {
   universalTargets(items: FileItem[]): Promise<UniversalTarget[]>
   universalConvert(items: FileItem[], options: UniversalOptions): Promise<void>
   getSettings(): Promise<SettingsState>
+  /** Сбросить все настройки к значениям по умолчанию */
+  resetSettings(): Promise<SettingsState>
+  /** Открыть папку с данными (настройки, модули, журнал) */
+  openDataFolder(): Promise<void>
+  /** Журнал ошибок */
+  openLogsFolder(): Promise<void>
+  logRendererError(message: string, stack?: string): Promise<void>
+  updatesState(): Promise<UpdateState>
+  updatesCheck(): Promise<void>
+  updatesDownload(): Promise<void>
+  updatesInstall(): Promise<void>
+  updatesDismiss(): Promise<void>
+  onUpdateState(callback: (s: UpdateState) => void): () => void
+  /** Готовит обращение о проблеме: адрес нового Issue и пояснение, если текст ушёл в буфер обмена */
+  reportProblem(note?: string): Promise<ProblemReport>
   patchSettings(patch: Partial<AppSettings>): Promise<SettingsState>
   getPathForFile(file: File): string
   pickFiles(): Promise<string[]>

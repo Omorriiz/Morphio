@@ -20,6 +20,7 @@ import GifCanvas from '../components/GifCanvas'
 import { BackgroundPanel, CropPanel, LayerPanel, ratioOf } from '../components/GifTools'
 import type { CropAspect } from '../components/GifTools'
 import { commitTextScale, newStickerLayer, newTextLayer, renderEmoji } from '../gifLayers'
+import { usePersistentState } from '../uiStore'
 import { useDropZone } from '../hooks/useDropZone'
 import { formatBytes } from '../lib'
 import { useI18n } from '../i18n'
@@ -66,20 +67,20 @@ export default function GifView({ active }: { active: boolean }): React.JSX.Elem
   const [rangeFrom, setRangeFrom] = useState(0)
   const [rangeTo, setRangeTo] = useState(0)
 
-  const [format, setFormat] = useState<'gif' | 'webp' | 'apng'>('gif')
-  const [width, setWidth] = useState<number | undefined>(undefined)
-  const [fit, setFit] = useState<'contain' | 'cover'>('contain')
-  const [background, setBackground] = useState('transparent')
-  const [defaultDelay, setDefaultDelay] = useState(100)
-  const [loop, setLoop] = useState(0)
-  const [order, setOrder] = useState<'normal' | 'reverse' | 'pingpong'>('normal')
-  const [colours, setColours] = useState(256)
-  const [dither, setDither] = useState(true)
-  const [quality, setQuality] = useState(80)
-  const [limitSize, setLimitSize] = useState(false)
-  const [targetMB, setTargetMB] = useState(2)
+  const [format, setFormat] = usePersistentState<'gif' | 'webp' | 'apng'>('gif.format', 'gif')
+  const [width, setWidth] = usePersistentState<number | undefined>('gif.width', undefined)
+  const [fit, setFit] = usePersistentState<'contain' | 'cover'>('gif.fit', 'contain')
+  const [background, setBackground] = usePersistentState('gif.background', 'transparent')
+  const [defaultDelay, setDefaultDelay] = usePersistentState('gif.defaultDelay', 100)
+  const [loop, setLoop] = usePersistentState('gif.loop', 0)
+  const [order, setOrder] = usePersistentState<'normal' | 'reverse' | 'pingpong'>('gif.order', 'normal')
+  const [colours, setColours] = usePersistentState('gif.colours', 256)
+  const [dither, setDither] = usePersistentState('gif.dither', true)
+  const [quality, setQuality] = usePersistentState('gif.quality', 80)
+  const [limitSize, setLimitSize] = usePersistentState('gif.limitSize', false)
+  const [targetMB, setTargetMB] = usePersistentState('gif.targetMB', 2)
   const [name, setName] = useState('animation')
-  const [outputDir, setOutputDir] = useState<string | undefined>(undefined)
+  const [outputDir, setOutputDir] = usePersistentState<string | undefined>('gif.outputDir', undefined)
 
   const [building, setBuilding] = useState(false)
   const [progress, setProgress] = useState<GifProgress | null>(null)

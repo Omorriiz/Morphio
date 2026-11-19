@@ -1,0 +1,301 @@
+THIRD-PARTY NOTICES / СТОРОННИЕ КОМПОНЕНТЫ
+
+Morphio uses the programs and libraries below. Each keeps its own licence.
+Morphio использует перечисленные программы и библиотеки; у каждой своя лицензия.
+
+== Programs and models outside npm / Программы и модели вне npm ==
+
+FFmpeg (gyan.dev essentials 6.1.1)
+  Licence: GPL-3.0-or-later
+  https://ffmpeg.org/ , https://www.gyan.dev/ffmpeg/builds/
+  Запускается как отдельная программа. Исходный код: https://ffmpeg.org/download.html и https://github.com/GyanD/codexffmpeg
+
+ISNet general use (DIS)
+  Licence: Apache-2.0
+  https://github.com/xuebinqin/DIS
+  Модель удаления фона, скачивается по кнопке
+
+Real-ESRGAN general-x4v3
+  Licence: BSD-3-Clause
+  https://github.com/xinntao/Real-ESRGAN
+  Модель увеличения фото, скачивается по кнопке
+
+Tesseract OCR data (tessdata_fast)
+  Licence: Apache-2.0
+  https://github.com/tesseract-ocr/tessdata_fast
+  Языки распознавания, скачиваются по кнопке
+
+whisper.cpp / Whisper models
+  Licence: MIT
+  https://github.com/ggml-org/whisper.cpp
+  Распознавание речи, скачивается по кнопке
+
+Pandoc
+  Licence: GPL-2.0-or-later
+  https://pandoc.org
+  Отдельный модуль документов, скачивается по кнопке; запускается как отдельная программа
+
+7-Zip
+  Licence: LGPL-2.1-or-later (с правилом unRAR)
+  https://www.7-zip.org
+  Архивы, через пакет 7zip-bin
+
+== npm packages / Пакеты npm ==
+
+@derhuerst/http-basic 8.2.4  [MIT]  https://github.com/derhuerst/http-basic.git
+@fast-csv/format 4.3.5  [MIT]  https://github.com/C2FO/fast-csv.git
+@fast-csv/parse 4.3.6  [MIT]  https://github.com/C2FO/fast-csv.git
+@img/colour 1.1.0  [MIT]  https://github.com/lovell/colour.git
+@img/sharp-win32-x64 0.35.5  [Apache-2.0 AND LGPL-3.0-or-later]  https://github.com/lovell/sharp.git
+@napi-rs/canvas 1.1.1  [MIT]  https://github.com/Brooooooklyn/canvas.git
+@napi-rs/canvas-win32-x64-msvc 1.1.1  [MIT]  https://github.com/Brooooooklyn/canvas.git
+@nodable/entities 3.1.0  [MIT]  https://github.com/nodable/val-parsers.git
+@pdf-lib/standard-fonts 1.0.0  [MIT]  https://github.com/Hopding/standard-fonts.git
+@pdf-lib/upng 1.0.1  [MIT]  https://github.com/Hopding/upng
+@types/node 10.17.60  [MIT]  https://github.com/DefinitelyTyped/DefinitelyTyped.git
+@types/node 14.18.63  [MIT]  https://github.com/DefinitelyTyped/DefinitelyTyped.git
+7zip-bin 5.2.0  [MIT]  develar/7zip-bin
+adm-zip 0.6.1  [MIT]  https://github.com/cthackers/adm-zip.git
+agent-base 6.0.2  [MIT]  git://github.com/TooTallNate/node-agent-base.git
+anynum 1.0.1  [MIT]  https://github.com/NaturalIntelligence/anynum
+archiver 5.3.2  [MIT]  https://github.com/archiverjs/node-archiver.git
+archiver-utils 2.1.0  [MIT]  https://github.com/archiverjs/archiver-utils.git
+archiver-utils 3.0.4  [MIT]  https://github.com/archiverjs/archiver-utils.git
+argparse 2.0.1  [Python-2.0]  nodeca/argparse
+array-buffer-byte-length 1.0.2  [MIT]  https://github.com/inspect-js/array-buffer-byte-length.git
+arraybuffer.prototype.slice 1.0.4  [MIT]  https://github.com/es-shims/ArrayBuffer.prototype.slice.git
+async 3.2.6  [MIT]  https://github.com/caolan/async.git
+async-function 1.0.0  [MIT]  https://github.com/ljharb/async-function.git
+available-typed-arrays 1.0.7  [MIT]  https://github.com/inspect-js/available-typed-arrays.git
+balanced-match 1.0.2  [MIT]  git://github.com/juliangruber/balanced-match.git
+base64-js 1.5.1  [MIT]  git://github.com/beatgammit/base64-js.git
+big-integer 1.6.52  [Unlicense]  git@github.com:peterolson/BigInteger.js.git
+binary 0.3.0  [MIT]  http://github.com/substack/node-binary.git
+bl 4.1.0  [MIT]  https://github.com/rvagg/bl.git
+bluebird 3.4.7  [MIT]  git://github.com/petkaantonov/bluebird.git
+bmp-js 0.1.0  [MIT]  https://github.com/shaozilee/bmp-js
+brace-expansion 1.1.22  [MIT]  git://github.com/juliangruber/brace-expansion.git
+brace-expansion 2.1.8  [MIT]  git://github.com/juliangruber/brace-expansion.git
+buffer 5.7.1  [MIT]  git://github.com/feross/buffer.git
+buffer-crc32 0.2.13  [MIT]  git://github.com/brianloveswords/buffer-crc32.git
+buffer-from 1.1.2  [MIT]  LinusU/buffer-from
+buffer-indexof-polyfill 1.0.2  [MIT]  https://github.com/sarosia/buffer-indexof-polyfill.git
+buffers 0.1.1  [UNKNOWN]  http://github.com/substack/node-buffers.git
+builder-util-runtime 9.7.0  [MIT]  https://github.com/electron-userland/electron-builder.git
+call-bind 1.0.9  [MIT]  https://github.com/ljharb/call-bind.git
+call-bind-apply-helpers 1.0.2  [MIT]  https://github.com/ljharb/call-bind-apply-helpers.git
+call-bound 1.0.4  [MIT]  https://github.com/ljharb/call-bound.git
+caseless 0.12.0  [Apache-2.0]  https://github.com/mikeal/caseless
+chainsaw 0.1.0  [MIT/X11]  http://github.com/substack/node-chainsaw.git
+chokidar 6.0.0  [MIT]  https://github.com/paulmillr/chokidar.git
+compress-commons 4.1.2  [MIT]  https://github.com/archiverjs/node-compress-commons.git
+concat-map 0.0.1  [MIT]  git://github.com/substack/node-concat-map.git
+concat-stream 2.0.0  [MIT]  http://github.com/maxogden/concat-stream.git
+core-util-is 1.0.3  [MIT]  git://github.com/isaacs/core-util-is
+crc-32 1.2.2  [Apache-2.0]  git://github.com/SheetJS/js-crc32.git
+crc32-stream 4.0.3  [MIT]  https://github.com/archiverjs/node-crc32-stream.git
+data-view-buffer 1.0.2  [MIT]  https://github.com/inspect-js/data-view-buffer.git
+data-view-byte-length 1.0.2  [MIT]  https://github.com/inspect-js/data-view-byte-length.git
+data-view-byte-offset 1.0.1  [MIT]  https://github.com/inspect-js/data-view-byte-offset.git
+dayjs 1.11.23  [MIT]  https://github.com/iamkun/dayjs.git
+debug 4.4.3  [MIT]  git://github.com/debug-js/debug.git
+define-data-property 1.1.4  [MIT]  https://github.com/ljharb/define-data-property.git
+define-properties 1.2.1  [MIT]  git://github.com/ljharb/define-properties.git
+detect-libc 2.1.2  [Apache-2.0]  git://github.com/lovell/detect-libc.git
+dunder-proto 1.0.1  [MIT]  https://github.com/es-shims/dunder-proto.git
+duplexer2 0.1.4  [BSD-3-Clause]  deoxxa/duplexer2
+electron-updater 6.8.11  [MIT]  https://github.com/electron-userland/electron-builder.git
+end-of-stream 1.4.5  [MIT]  git://github.com/mafintosh/end-of-stream.git
+env-paths 2.2.1  [MIT]  sindresorhus/env-paths
+es-abstract 1.24.2  [MIT]  git://github.com/ljharb/es-abstract.git
+es-abstract-get 1.0.0  [MIT]  https://github.com/ljharb/es-abstract-get.git
+es-define-property 1.0.1  [MIT]  https://github.com/ljharb/es-define-property.git
+es-errors 1.3.0  [MIT]  https://github.com/ljharb/es-errors.git
+es-object-atoms 1.1.2  [MIT]  https://github.com/ljharb/es-object-atoms.git
+es-set-tostringtag 2.1.0  [MIT]  https://github.com/es-shims/es-set-tostringtag.git
+es-to-primitive 1.3.4  [MIT]  git://github.com/ljharb/es-to-primitive.git
+escape-string-regexp 4.0.0  [MIT]  sindresorhus/escape-string-regexp
+exceljs 4.4.0  [MIT]  https://github.com/exceljs/exceljs.git
+fast-csv 4.3.6  [MIT]  https://github.com/C2FO/fast-csv.git
+fast-xml-builder 1.3.1  [MIT]  https://github.com/NaturalIntelligence/fast-xml-builder.git
+fast-xml-parser 5.12.0  [MIT]  https://github.com/NaturalIntelligence/fast-xml-parser.git
+ffmpeg-static 5.3.0  [GPL-3.0-or-later]  https://github.com/eugeneware/ffmpeg-static
+for-each 0.3.5  [MIT]  https://github.com/Raynos/for-each.git
+fs-constants 1.0.0  [MIT]  https://github.com/mafintosh/fs-constants.git
+fs-extra 10.1.0  [MIT]  https://github.com/jprichardson/node-fs-extra
+fs.realpath 1.0.0  [ISC]  https://github.com/isaacs/fs.realpath.git
+fstream 1.0.12  [ISC]  https://github.com/npm/fstream.git
+function-bind 1.1.2  [MIT]  https://github.com/Raynos/function-bind.git
+function.prototype.name 1.2.0  [MIT]  git://github.com/es-shims/Function.prototype.name.git
+functions-have-names 1.2.3  [MIT]  https://github.com/inspect-js/functions-have-names.git
+generator-function 2.0.1  [MIT]  https://github.com/TimothyGu/generator-function.git
+get-intrinsic 1.3.0  [MIT]  https://github.com/ljharb/get-intrinsic.git
+get-proto 1.0.1  [MIT]  https://github.com/ljharb/get-proto.git
+get-symbol-description 1.1.0  [MIT]  https://github.com/inspect-js/get-symbol-description.git
+glob 7.2.3  [ISC]  git://github.com/isaacs/node-glob.git
+global-agent 4.1.7  [BSD-3-Clause]  https://github.com/gajus/global-agent
+globalthis 1.0.4  [MIT]  git://github.com/ljharb/System.global.git
+gopd 1.2.0  [MIT]  https://github.com/ljharb/gopd.git
+graceful-fs 4.2.11  [ISC]  https://github.com/isaacs/node-graceful-fs
+has-bigints 1.1.0  [MIT]  https://github.com/ljharb/has-bigints.git
+has-property-descriptors 1.0.2  [MIT]  https://github.com/inspect-js/has-property-descriptors.git
+has-proto 1.2.0  [MIT]  https://github.com/inspect-js/has-proto.git
+has-symbols 1.1.0  [MIT]  git://github.com/inspect-js/has-symbols.git
+has-tostringtag 1.0.2  [MIT]  https://github.com/inspect-js/has-tostringtag.git
+hasown 2.0.4  [MIT]  https://github.com/inspect-js/hasOwn.git
+heic-decode 2.1.0  [ISC]  https://github.com/catdad-experiments/heic-decode.git
+http-response-object 3.0.2  [MIT]  https://github.com/ForbesLindesay/http-response-object.git
+https-proxy-agent 5.0.1  [MIT]  git://github.com/TooTallNate/node-https-proxy-agent.git
+iconv-lite 0.7.3  [MIT]  https://github.com/pillarjs/iconv-lite.git
+idb-keyval 6.3.0  [Apache-2.0]  https://github.com/jakearchibald/idb-keyval.git
+ieee754 1.2.1  [BSD-3-Clause]  git://github.com/feross/ieee754.git
+immediate 3.0.6  [MIT]  git://github.com/calvinmetcalf/immediate.git
+inflight 1.0.6  [ISC]  https://github.com/npm/inflight.git
+inherits 2.0.4  [ISC]  git://github.com/isaacs/inherits
+internal-slot 1.1.0  [MIT]  https://github.com/ljharb/internal-slot.git
+is-array-buffer 3.0.5  [MIT]  https://github.com/inspect-js/is-array-buffer.git
+is-async-function 2.1.1  [MIT]  git://github.com/inspect-js/is-async-function.git
+is-bigint 1.1.0  [MIT]  https://github.com/inspect-js/is-bigint.git
+is-boolean-object 1.2.2  [MIT]  git://github.com/inspect-js/is-boolean-object.git
+is-callable 1.2.7  [MIT]  git://github.com/inspect-js/is-callable.git
+is-data-view 1.0.2  [MIT]  https://github.com/inspect-js/is-data-view.git
+is-date-object 1.1.0  [MIT]  git://github.com/inspect-js/is-date-object.git
+is-document.all 1.0.0  [MIT]  https://github.com/inspect-js/is-document.all.git
+is-finalizationregistry 1.1.1  [MIT]  https://github.com/inspect-js/is-finalizationregistry.git
+is-generator-function 1.1.2  [MIT]  git://github.com/inspect-js/is-generator-function.git
+is-map 2.0.3  [MIT]  https://github.com/inspect-js/is-map.git
+is-negative-zero 2.0.3  [MIT]  git://github.com/inspect-js/is-negative-zero.git
+is-number-object 1.1.1  [MIT]  git://github.com/inspect-js/is-number-object.git
+is-regex 1.2.1  [MIT]  git://github.com/inspect-js/is-regex.git
+is-set 2.0.3  [MIT]  https://github.com/inspect-js/is-set.git
+is-shared-array-buffer 1.0.4  [MIT]  https://github.com/inspect-js/is-shared-array-buffer.git
+is-string 1.1.1  [MIT]  git://github.com/inspect-js/is-string.git
+is-symbol 1.1.1  [MIT]  git://github.com/inspect-js/is-symbol.git
+is-typed-array 1.1.15  [MIT]  git://github.com/inspect-js/is-typed-array.git
+is-unsafe 2.0.3  [MIT]  https://github.com/NaturalIntelligence/is-unsafe
+is-url 1.2.4  [MIT]  https://github.com/segmentio/is-url
+is-weakmap 2.0.2  [MIT]  https://github.com/inspect-js/is-weakmap.git
+is-weakref 1.1.1  [MIT]  https://github.com/inspect-js/is-weakref.git
+is-weakset 2.0.4  [MIT]  https://github.com/inspect-js/is-weakset.git
+isarray 1.0.0  [MIT]  git://github.com/juliangruber/isarray.git
+isarray 2.0.5  [MIT]  git://github.com/juliangruber/isarray.git
+js-yaml 4.3.2  [MIT]  nodeca/js-yaml
+jschardet 4.1.0  [0BSD]  https://github.com/aadsm/jschardet.git
+jsonfile 6.2.1  [MIT]  git@github.com:jprichardson/node-jsonfile.git
+jszip 3.10.2  [(MIT OR GPL-3.0-or-later)]  https://github.com/Stuk/jszip.git
+lazy-val 1.0.5  [MIT]  develar/lazy-val
+lazystream 1.0.1  [MIT]  https://github.com/jpommerening/node-lazystream.git
+libheif-js 1.23.5  [LGPL-3.0]  https://github.com/catdad-experiments/libheif-js.git
+lie 3.3.0  [MIT]  https://github.com/calvinmetcalf/lie.git
+listenercount 1.0.1  [ISC]  git@github.com:jden/node-listenercount.git
+lodash.defaults 4.2.0  [MIT]  lodash/lodash
+lodash.difference 4.5.0  [MIT]  lodash/lodash
+lodash.escaperegexp 4.1.2  [MIT]  lodash/lodash
+lodash.flatten 4.4.0  [MIT]  lodash/lodash
+lodash.groupby 4.6.0  [MIT]  lodash/lodash
+lodash.isboolean 3.0.3  [MIT]  lodash/lodash
+lodash.isequal 4.5.0  [MIT]  lodash/lodash
+lodash.isfunction 3.0.9  [MIT]  lodash/lodash
+lodash.isnil 4.0.0  [MIT]  lodash/lodash
+lodash.isplainobject 4.0.6  [MIT]  lodash/lodash
+lodash.isundefined 3.0.1  [MIT]  lodash/lodash
+lodash.union 4.6.0  [MIT]  lodash/lodash
+lodash.uniq 4.5.0  [MIT]  lodash/lodash
+matcher 4.0.0  [MIT]  sindresorhus/matcher
+math-intrinsics 1.1.0  [MIT]  https://github.com/es-shims/math-intrinsics.git
+minimatch 3.1.5  [ISC]  git://github.com/isaacs/minimatch.git
+minimatch 5.1.9  [ISC]  git://github.com/isaacs/minimatch.git
+minimist 1.2.8  [MIT]  git://github.com/minimistjs/minimist.git
+mkdirp 0.5.6  [MIT]  https://github.com/substack/node-mkdirp.git
+ms 2.1.3  [MIT]  vercel/ms
+node-fetch 2.7.0  [MIT]  https://github.com/bitinn/node-fetch.git
+normalize-path 3.0.0  [MIT]  jonschlinkert/normalize-path
+object-inspect 1.13.4  [MIT]  git://github.com/inspect-js/object-inspect.git
+object-keys 1.1.1  [MIT]  git://github.com/ljharb/object-keys.git
+object.assign 4.1.7  [MIT]  git://github.com/ljharb/object.assign.git
+once 1.4.0  [ISC]  git://github.com/isaacs/once
+onnxruntime-common 1.31.1  [MIT]  https://github.com/Microsoft/onnxruntime.git
+onnxruntime-node 1.31.1  [MIT]  https://github.com/Microsoft/onnxruntime.git
+opencollective-postinstall 2.0.3  [MIT]  https://github.com/opencollective/opencollective-postinstall.git
+own-keys 1.0.2  [MIT]  https://github.com/ljharb/own-keys.git
+pako 1.0.11  [(MIT AND Zlib)]  nodeca/pako
+papaparse 5.7.1  [MIT]  https://github.com/mholt/PapaParse.git
+parse-cache-control 1.0.1  [BSD]  https://github.com/roryf/parse-cache-control.git
+path-expression-matcher 1.6.2  [MIT]  https://github.com/NaturalIntelligence/path-expression-matcher
+path-is-absolute 1.0.1  [MIT]  sindresorhus/path-is-absolute
+pdf-lib 1.17.1  [MIT]  https://github.com/Hopding/pdf-lib.git
+pdfjs-dist 6.5.438  [Apache-2.0]  https://github.com/mozilla/pdf.js.git
+possible-typed-array-names 1.1.0  [MIT]  https://github.com/ljharb/possible-typed-array-names.git
+process-nextick-args 2.0.1  [MIT]  https://github.com/calvinmetcalf/process-nextick-args.git
+progress 2.0.3  [MIT]  git://github.com/visionmedia/node-progress
+react 19.3.1  [MIT]  https://github.com/react/react.git
+react-dom 19.3.1  [MIT]  https://github.com/react/react.git
+readable-stream 2.3.8  [MIT]  git://github.com/nodejs/readable-stream
+readable-stream 3.6.2  [MIT]  git://github.com/nodejs/readable-stream
+readdir-glob 1.1.3  [Apache-2.0]  git://github.com/Yqnn/node-readdir-glob.git
+readdirp 5.1.1  [MIT]  https://github.com/paulmillr/readdirp.git
+reflect.getprototypeof 1.0.10  [MIT]  https://github.com/es-shims/Reflect.getPrototypeOf.git
+regenerator-runtime 0.13.11  [MIT]  https://github.com/facebook/regenerator/tree/main/packages/runtime
+regexp.prototype.flags 1.5.4  [MIT]  git://github.com/es-shims/RegExp.prototype.flags.git
+rimraf 2.6.3  [ISC]  git://github.com/isaacs/rimraf.git
+safe-array-concat 1.1.4  [MIT]  https://github.com/ljharb/safe-array-concat.git
+safe-buffer 5.1.2  [MIT]  git://github.com/feross/safe-buffer.git
+safe-push-apply 1.0.0  [MIT]  https://github.com/ljharb/safe-push-apply.git
+safe-regex-test 1.1.0  [MIT]  https://github.com/ljharb/safe-regex-test.git
+safer-buffer 2.1.2  [MIT]  https://github.com/ChALkeR/safer-buffer.git
+sax 1.6.1  [BlueOak-1.0.0]  ssh://git@github.com/isaacs/sax-js.git
+saxes 5.0.1  [ISC]  https://github.com/lddubeau/saxes.git
+scheduler 0.28.0  [MIT]  https://github.com/react/react.git
+semver 7.7.4  [ISC]  https://github.com/npm/node-semver.git
+semver 7.8.6  [ISC]  https://github.com/npm/node-semver.git
+serialize-error 8.1.0  [MIT]  sindresorhus/serialize-error
+set-function-length 1.2.2  [MIT]  https://github.com/ljharb/set-function-length.git
+set-function-name 2.0.2  [MIT]  https://github.com/ljharb/set-function-name.git
+set-proto 1.0.0  [MIT]  https://github.com/ljharb/set-proto.git
+setimmediate 1.0.5  [MIT]  YuzuJS/setImmediate
+sharp 0.35.5  [Apache-2.0]  https://github.com/lovell/sharp.git
+side-channel 1.1.1  [MIT]  https://github.com/ljharb/side-channel.git
+side-channel-list 1.0.1  [MIT]  https://github.com/ljharb/side-channel-list.git
+side-channel-map 1.0.1  [MIT]  https://github.com/ljharb/side-channel-map.git
+side-channel-weakmap 1.0.2  [MIT]  https://github.com/ljharb/side-channel-weakmap.git
+stop-iteration-iterator 1.1.0  [MIT]  https://github.com/ljharb/stop-iteration-iterator.git
+string_decoder 1.1.1  [MIT]  git://github.com/nodejs/string_decoder.git
+string.prototype.trim 1.2.11  [MIT]  git://github.com/es-shims/String.prototype.trim.git
+string.prototype.trimend 1.0.10  [MIT]  git://github.com/es-shims/String.prototype.trimEnd.git
+string.prototype.trimstart 1.0.8  [MIT]  git://github.com/es-shims/String.prototype.trimStart.git
+strnum 2.5.1  [MIT]  https://github.com/NaturalIntelligence/strnum
+tar-stream 2.2.0  [MIT]  https://github.com/mafintosh/tar-stream.git
+tesseract.js 7.0.0  [Apache-2.0]  https://github.com/naptha/tesseract.js.git
+tesseract.js-core 7.0.0  [Apache-2.0]  https://github.com/naptha/tesseract.js-core.git
+tiny-typed-emitter 2.1.0  [MIT]  https://github.com/binier/tiny-typed-emitter.git
+tmp 0.2.7  [MIT]  https://github.com/raszi/node-tmp.git
+tr46 0.0.3  [MIT]  https://github.com/Sebmaster/tr46.js.git
+traverse 0.3.10  [MIT]  git://github.com/ljharb/js-traverse.git
+tslib 1.14.1  [0BSD]  https://github.com/Microsoft/tslib.git
+type-fest 0.20.2  [(MIT OR CC0-1.0)]  sindresorhus/type-fest
+typed-array-buffer 1.0.3  [MIT]  https://github.com/inspect-js/typed-array-buffer.git
+typed-array-byte-length 1.0.3  [MIT]  https://github.com/inspect-js/typed-array-byte-length.git
+typed-array-byte-offset 1.0.5  [MIT]  https://github.com/inspect-js/typed-array-byte-offset.git
+typed-array-length 1.0.8  [MIT]  https://github.com/inspect-js/typed-array-length.git
+typedarray 0.0.6  [MIT]  git://github.com/substack/typedarray.git
+typedarray.prototype.slice 1.0.6  [MIT]  https://github.com/es-shims/TypedArray.prototype.slice.git
+unbox-primitive 1.1.0  [MIT]  https://github.com/ljharb/unbox-primitive.git
+universalify 2.0.1  [MIT]  https://github.com/RyanZim/universalify.git
+unzipper 0.10.14  [MIT]  https://github.com/ZJONSSON/node-unzipper.git
+util-deprecate 1.0.2  [MIT]  git://github.com/TooTallNate/util-deprecate.git
+uuid 8.3.2  [MIT]  https://github.com/uuidjs/uuid.git
+wasm-feature-detect 1.10.1  [Apache-2.0]  GoogleChromeLabs/wasm-feature-detect
+webidl-conversions 3.0.1  [BSD-2-Clause]  jsdom/webidl-conversions
+whatwg-url 5.0.0  [MIT]  jsdom/whatwg-url
+which-boxed-primitive 1.1.1  [MIT]  https://github.com/inspect-js/which-boxed-primitive.git
+which-builtin-type 1.2.1  [MIT]  https://github.com/inspect-js/which-builtin-type.git
+which-collection 1.0.2  [MIT]  https://github.com/inspect-js/which-collection.git
+which-typed-array 1.1.24  [MIT]  git://github.com/inspect-js/which-typed-array.git
+wrappy 1.0.2  [ISC]  https://github.com/npm/wrappy
+xml-naming 0.3.0  [MIT]  https://github.com/NaturalIntelligence/xml-naming
+xmlchars 2.2.0  [MIT]  https://github.com/lddubeau/xmlchars.git
+yaml 2.9.1  [ISC]  github:eemeli/yaml
+zip-stream 4.1.1  [MIT]  https://github.com/archiverjs/node-zip-stream.git
+zlibjs 0.3.1  [MIT]  git://github.com/imaya/zlib.js.git
+
+Licence not found in package.json for: buffers

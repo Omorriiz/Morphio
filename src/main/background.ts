@@ -42,6 +42,10 @@ let pendingOpen: string[] = []
 let watcher: WatchManager | null = null
 
 export const isQuitting = (): boolean => quitting
+/** Помечает завершение работы (установка обновления): окно не уйдёт в трей вместо закрытия. */
+export function markQuitting(): void {
+  quitting = true
+}
 export const hasTray = (): boolean => tray !== null
 
 /** exe, который надо записывать в реестр и в автозапуск: для портативной версии это сам файл, а не распакованная копия. */

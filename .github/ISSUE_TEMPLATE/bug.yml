@@ -1,0 +1,34 @@
+name: Bug report / Сообщение об ошибке
+description: Something does not work / Что-то не работает
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / Что произошло?
+      description: What you did and what you expected / Что вы делали и что ожидали
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Morphio version / Версия
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version / Версия Windows
+      placeholder: Windows 11 23H2
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Installer or portable? / Установщик или портативная версия?
+      options: [Installer, Portable]
+  - type: textarea
+    id: log
+    attributes:
+      label: Log / Журнал
+      description: Settings → About and data → Open the log folder. Paste the last lines. / Настройки → О программе и данные → Открыть папку журнала. Вставьте последние строки.
+      render: text

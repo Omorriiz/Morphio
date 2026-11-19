@@ -39,11 +39,14 @@ echo [4/4] Building the app (this takes a minute)...
 call npm run dist
 if errorlevel 1 goto fail
 
-if not exist release\Morphio.exe goto nofile
-copy /y release\Morphio.exe Morphio.exe >nul
+set "PORTABLE="
+for %%f in (release\Morphio-Portable-*.exe) do set "PORTABLE=%%f"
+if "%PORTABLE%"=="" goto nofile
+copy /y "%PORTABLE%" Morphio.exe >nul
 if errorlevel 1 goto fail
 echo.
-echo Done! File: %~dp0Morphio.exe
+echo Done! Portable: %~dp0Morphio.exe
+echo Installer: %~dp0release\Morphio-Setup-*.exe
 echo.
 pause
 exit /b 0
@@ -54,7 +57,7 @@ pause
 exit /b 1
 
 :nofile
-echo [ERROR] release\Morphio.exe was not created.
+echo [ERROR] release\Morphio-Portable-*.exe was not created.
 
 :fail
 echo.

@@ -2,6 +2,8 @@ import { INPUT_IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from '@shared/types'
 import { SUBTITLE_EXTENSIONS } from '@shared/subtitles'
 import type { FileItem, JobProgress } from '@shared/types'
 import { formatBytes, formatDuration } from '../lib'
+import { useState } from 'react'
+import Modal from './Modal'
 import { useI18n } from '../i18n'
 
 interface Props {
@@ -44,7 +46,9 @@ export default function FileList({
   onEditSubs
 }: Props): React.JSX.Element {
   const { t } = useI18n()
+  const [details, setDetails] = useState<{ name: string; text: string; copied: boolean } | null>(null)
   return (
+    <>
     <ul className={`file-list ${compact ? 'compact' : ''} ${flow ? 'flow' : ''}`}>
       {files.map((f) => {
         const p = progress[f.id]
@@ -88,9 +92,13 @@ export default function FileList({
               {p?.status === 'working' && <span className="spinner" aria-label={t('Обработка')} />}
               {p?.status === 'pending' && <span className="muted">{t('В очереди')}</span>}
               {p?.status === 'error' && (
-                <span className="error error-text" title={p.error}>
+                <button
+                  className="error error-text error-link"
+                  title={t('Подробности')}
+                  onClick={() => setDetails({ name: f.name, text: p.error ?? '', copied: false })}
+                >
                   {p.error && p.error.length <= 60 ? p.error : t('Не получилось')}
-                </span>
+                </button>
               )}
               {p?.status === 'done' && p.outputPath && (
                 <>
@@ -156,5 +164,33 @@ export default function FileList({
         )
       })}
     </ul>
+    {details && (
+      <Modal
+        title={`${t('Подробности ошибки')}: ${details.name}`}
+        onClose={() => setDetails(null)}
+        footer={
+          <>
+            <button
+              className="btn soft"
+              onClick={() => {
+                void navigator.clipboard.writeText(details.text).then(() => setDetails({ ...details, copied: true }))
+              }}
+            >
+              {details.copied ? t('Скопировано') : t('Скопировать')}
+            </button>
+            <button className="btn soft" onClick={() => void window.api.reportProblem(`${details.name}
+${details.text}`)}>
+              {t('Сообщить о проблеме')}
+            </button>
+            <button className="btn primary" onClick={() => setDetails(null)}>
+              {t('Закрыть')}
+            </button>
+          </>
+        }
+      >
+        <pre className="crash-text">{details.text}</pre>
+      </Modal>
+    )}
+    </>
   )
 }

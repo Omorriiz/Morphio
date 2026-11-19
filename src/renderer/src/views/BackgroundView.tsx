@@ -10,6 +10,7 @@ import type {
   ModelDownloadProgress,
   ModelStatus
 } from '@shared/types'
+import { usePersistentState } from '../uiStore'
 import { useFileJobs } from '../hooks/useFileJobs'
 import FileList from '../components/FileList'
 import DropOverlay from '../components/DropOverlay'
@@ -52,17 +53,17 @@ export default function BackgroundView({ active }: { active: boolean }): React.J
   const [download, setDownload] = useState<ModelDownloadProgress | null>(null)
   const [downloading, setDownloading] = useState(false)
 
-  const [method, setMethod] = useState<BgMethod>('auto')
-  const [tolerance, setTolerance] = useState(0) // 0 = подобрать автоматически
-  const [everywhere, setEverywhere] = useState(true)
-  const [translucent, setTranslucent] = useState(true)
+  const [method, setMethod] = usePersistentState<BgMethod>('photo.method', 'auto')
+  const [tolerance, setTolerance] = usePersistentState('photo.tolerance', 0) // 0 = подобрать автоматически
+  const [everywhere, setEverywhere] = usePersistentState('photo.everywhere', true)
+  const [translucent, setTranslucent] = usePersistentState('photo.translucent', true)
   const [bgColor, setBgColor] = useState<string | undefined>(undefined)
   const [picking, setPicking] = useState(false)
   const [editing, setEditing] = useState<{ file: FileItem; result: JobProgress } | null>(null)
-  const [mode, setMode] = useState<'transparent' | 'color'>('transparent')
-  const [color, setColor] = useState('#ffffff')
-  const [format, setFormat] = useState<BgOutputFormat>('png')
-  const [outputDir, setOutputDir] = useState<string | undefined>(undefined)
+  const [mode, setMode] = usePersistentState<'transparent' | 'color'>('photo.mode', 'transparent')
+  const [color, setColor] = usePersistentState('photo.color', '#ffffff')
+  const [format, setFormat] = usePersistentState<BgOutputFormat>('photo.format', 'png')
+  const [outputDir, setOutputDir] = usePersistentState<string | undefined>('photo.outputDir', undefined)
 
   const refreshModel = (): void => {
     void window.api.modelStatus().then(setModel)

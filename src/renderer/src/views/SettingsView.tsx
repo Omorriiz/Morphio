@@ -3,6 +3,8 @@ import { DEFAULT_HOTKEY } from '@shared/types'
 import { LANGUAGES } from '@shared/i18n'
 import type { LanguageSetting } from '@shared/i18n'
 import type { AppSettings, FileKind, SettingsState, ThemeSetting, UniversalTarget, WatchRule, WatchStatus } from '@shared/types'
+import { useUpdates } from '../hooks/useUpdates'
+import { initUiStore } from '../uiStore'
 import { useI18n } from '../i18n'
 import { Field, Segmented } from '../components/ui'
 import ModuleDownload from '../components/ModuleDownload'
@@ -38,6 +40,19 @@ function toAccelerator(e: React.KeyboardEvent): string | null {
 export default function SettingsView({ active }: { active: boolean }): React.JSX.Element {
   const { t, setting: languageSetting, setLanguage } = useI18n()
   const [state, setState] = useState<SettingsState | null>(null)
+  const updates = useUpdates()
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [reportNote, setReportNote] = useState('')
+
+  const reportProblem = async (): Promise<void> => {
+    const r = await window.api.reportProblem()
+    setReportNote(r.copied ? t('Отчёт слишком длинный для адреса: он скопирован в буфер обмена. Вставьте его в открывшуюся страницу.') : '')
+  }
+  const resetAll = async (): Promise<void> => {
+    initUiStore({})
+    await window.api.resetSettings()
+    window.location.reload()
+  }
   const [status, setStatus] = useState<WatchStatus[]>([])
   const [catalog, setCatalog] = useState<Record<string, UniversalTarget>>({})
   const [recording, setRecording] = useState(false)
@@ -324,6 +339,79 @@ export default function SettingsView({ active }: { active: boolean }): React.JSX
                 {t('Добавить правило')}
               </button>
             </div>
+          </div>
+        </section>
+
+        <section className="settings-card">
+          <h3>{t('Обновления')}</h3>
+          <p className="muted small">
+            {updates.status === 'unsupported'
+              ? t('Автообновление работает только у установленной версии. Портативную версию обновляйте вручную: скачайте новый файл со страницы релизов.')
+              : t('Проверка обращается к GitHub (виден ваш IP) и выключена, пока вы её не включите. Скачивание и установка всегда по вашей кнопке.')}
+          </p>
+          {updates.status !== 'unsupported' && (
+            <>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={state?.settings.checkUpdates ?? false}
+                  onChange={(e) => void patch({ checkUpdates: e.target.checked })}
+                />
+                <span>{t('Проверять обновления при запуске и раз в сутки')}</span>
+              </label>
+              <div className="row">
+                <button className="btn soft" disabled={updates.status === 'checking' || updates.status === 'downloading'} onClick={() => void window.api.updatesCheck()}>
+                  {updates.status === 'checking' ? t('Проверяю…') : t('Проверить сейчас')}
+                </button>
+                <span className="muted small">
+                  {updates.status === 'none' && t('У вас последняя версия')}
+                  {updates.status === 'available' && t('Доступна версия {v}', { v: updates.version ?? '' })}
+                  {updates.status === 'error' && t('Не удалось проверить: {msg}', { msg: updates.error ?? '' })}
+                </span>
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className="settings-card">
+          <h3>{t('О программе и данные')}</h3>
+          <p className="muted small">
+            {t('Morphio работает офлайн и ничего не отправляет в сеть. Журнал ошибок лежит только на вашем диске, имя пользователя в нём скрыто.')}
+          </p>
+          <p className="muted small">
+            {t('Morphio распространяется по лицензии GPL-3.0-or-later. Внутри работает FFmpeg (GPL-3.0), отдельная чужая программа; её исходный код:')}{' '}
+            <a href="https://ffmpeg.org/download.html" target="_blank" rel="noreferrer">ffmpeg.org</a>,{' '}
+            <a href="https://github.com/GyanD/codexffmpeg" target="_blank" rel="noreferrer">gyan.dev builds</a>.{' '}
+            <a href="https://github.com/Omorriiz/Morphio" target="_blank" rel="noreferrer">GitHub</a>
+          </p>
+          <div className="row">
+            <button className="btn soft" onClick={() => void window.api.openDataFolder()}>
+              {t('Открыть папку данных')}
+            </button>
+            <button className="btn soft" onClick={() => void window.api.openLogsFolder()}>
+              {t('Открыть папку журнала')}
+            </button>
+            <button className="btn soft" onClick={() => void reportProblem()}>
+              {t('Сообщить о проблеме')}
+            </button>
+          </div>
+          {reportNote && <p className="notice">{reportNote}</p>}
+          <div className="row">
+            {confirmReset ? (
+              <>
+                <span className="small">{t('Все настройки вернутся к значениям по умолчанию. Свои цепочки тоже сбросятся. Файлы не затрагиваются.')}</span>
+                <button className="btn danger" onClick={() => void resetAll()}>
+                  {t('Да, сбросить')}
+                </button>
+                <button className="btn ghost" onClick={() => setConfirmReset(false)}>
+                  {t('Отмена')}
+                </button>
+              </>
+            ) : (
+              <button className="btn ghost" onClick={() => setConfirmReset(true)}>
+                {t('Сбросить настройки')}
+              </button>
+            )}
           </div>
         </section>
       </div>

@@ -1,5 +1,6 @@
 import { DEFAULT_HOTKEY } from '@shared/types'
-import type { AppSettings, WatchRule } from '@shared/types'
+import { UI_STORE_LIMIT } from '@shared/types'
+import type { AppSettings, WatchRule, WindowState } from '@shared/types'
 
 /** Чистая часть настроек (без Electron): значения по умолчанию и проверка файла. Её удобно тестировать. */
 
@@ -14,7 +15,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hotkey: DEFAULT_HOTKEY,
   explorerMenu: false,
   quickLast: [],
-  watchRules: []
+  watchRules: [],
+  ui: {},
+  checkUpdates: false,
+  lastUpdateCheck: 0
 }
 
 const bool = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback)
@@ -34,6 +38,31 @@ function cleanRules(v: unknown): WatchRule[] {
     }))
 }
 
+function cleanWindow(v: unknown): WindowState | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const w = v as Record<string, unknown>
+  const num = (x: unknown): number | undefined => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x) : undefined)
+  const width = num(w.width)
+  const height = num(w.height)
+  if (!width || !height || width < 300 || height < 300 || width > 10000 || height > 10000) return undefined
+  return { width, height, x: num(w.x), y: num(w.y), maximized: w.maximized === true }
+}
+
+/** Значения экранов: обычный объект с короткими ключами, не больше лимита по размеру. */
+export function cleanUi(v: unknown): Record<string, unknown> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  const out: Record<string, unknown> = {}
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (k.length === 0 || k.length > 80 || val === undefined || typeof val === 'function') continue
+    out[k] = val
+  }
+  try {
+    return JSON.stringify(out).length <= UI_STORE_LIMIT ? out : {}
+  } catch {
+    return {}
+  }
+}
+
 /** Проверяет настройки: неизвестные и испорченные поля заменяются значениями по умолчанию. */
 export function sanitizeSettings(raw: Partial<AppSettings> | null | undefined): AppSettings {
   const r = raw ?? {}
@@ -48,6 +77,10 @@ export function sanitizeSettings(raw: Partial<AppSettings> | null | undefined): 
     hotkey: typeof r.hotkey === 'string' && r.hotkey ? r.hotkey : DEFAULT_HOTKEY,
     explorerMenu: bool(r.explorerMenu, DEFAULT_SETTINGS.explorerMenu),
     quickLast: Array.isArray(r.quickLast) ? r.quickLast.filter((x) => typeof x === 'string').slice(0, 20) : [],
-    watchRules: cleanRules(r.watchRules)
+    watchRules: cleanRules(r.watchRules),
+    window: cleanWindow(r.window),
+    ui: cleanUi(r.ui),
+    checkUpdates: bool(r.checkUpdates, DEFAULT_SETTINGS.checkUpdates),
+    lastUpdateCheck: typeof r.lastUpdateCheck === 'number' && Number.isFinite(r.lastUpdateCheck) ? r.lastUpdateCheck : 0
   }
 }

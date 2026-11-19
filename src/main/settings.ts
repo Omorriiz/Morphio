@@ -60,6 +60,12 @@ export function patchSettings(patch: Partial<AppSettings>): AppSettings {
   return before
 }
 
+/** Сброс: все настройки по умолчанию (файл перезаписывается). */
+export function resetSettings(): void {
+  current = { ...DEFAULT_SETTINGS, ui: {} }
+  scheduleSave()
+}
+
 /** Сохраняет настройки сразу и синхронно (при выходе: приложение не ждёт асинхронную запись). */
 export function flushSettings(): void {
   if (!saveTimer) return

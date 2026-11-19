@@ -1,5 +1,11 @@
 import type { FileItem, JobProgress } from '@shared/types'
 
+/** Куда сообщать об ошибках обработки (журнал). Задаётся приложением; в тестах не нужен. */
+let onJobError: ((name: string, error: unknown) => void) | undefined
+export function setJobErrorHook(hook: (name: string, error: unknown) => void): void {
+  onJobError = hook
+}
+
 export interface JobResult {
   outputPath: string
   outputSize: number
@@ -46,6 +52,7 @@ export class JobQueue {
           )
           report({ id: item.id, status: 'done', ...result })
         } catch (e) {
+          onJobError?.(item.name, e)
           report({
             id: item.id,
             status: 'error',

@@ -55,6 +55,9 @@ function demoSprite(): { image: HTMLCanvasElement; mask: HTMLCanvasElement } {
  */
 let mockSettings: AppSettings = {
   version: 1,
+  ui: {},
+  checkUpdates: false,
+  lastUpdateCheck: 0,
   language: 'system',
   theme: 'system',
   tray: false,
@@ -314,6 +317,17 @@ export function installDevMock(): void {
         audioRate: 48000
       })),
     montageSilence: async () => [],
+    updatesState: async () => ({ status: 'unsupported' as const }),
+    updatesCheck: async () => undefined,
+    updatesDownload: async () => undefined,
+    updatesInstall: async () => undefined,
+    updatesDismiss: async () => undefined,
+    onUpdateState: () => () => undefined,
+    resetSettings: async () => ({ settings: mockSettings, language: 'ru' as const, hotkeyOk: true }),
+    openDataFolder: async () => undefined,
+    openLogsFolder: async () => undefined,
+    logRendererError: async () => undefined,
+    reportProblem: async () => ({ url: '', copied: false }),
     subtitlesLoad: async () => [{ start: 1, end: 3, text: 'Привет, мир' }],
     subtitlesSave: async () => undefined,
     montageStrip: async () => {

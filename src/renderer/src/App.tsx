@@ -5,9 +5,18 @@ import PhotoView from './views/PhotoView'
 import GifView from './views/GifView'
 import MontageView from './views/MontageView'
 import SettingsView from './views/SettingsView'
+import UpdateBanner from './components/UpdateBanner'
+import { readUi, writeUi } from './uiStore'
 
 export default function App(): React.JSX.Element {
-  const [view, setView] = useState<ViewId>('convert')
+  const [view, setViewRaw] = useState<ViewId>(() => {
+    const v = readUi<string>('app.view', 'convert')
+    return (['convert', 'photo', 'montage', 'gif', 'settings'] as string[]).includes(v) ? (v as ViewId) : 'convert'
+  })
+  const setView = (v: ViewId): void => {
+    setViewRaw(v)
+    writeUi('app.view', v)
+  }
   // Файлы из трея, меню Проводника или быстрого окна открываются в конвертере.
   const [incoming, setIncoming] = useState<{ paths: string[]; n: number } | null>(null)
 
@@ -27,6 +36,7 @@ export default function App(): React.JSX.Element {
       <div className="titlebar" />
       <Sidebar active={view} onSelect={setView} />
       <main className="content">
+        <UpdateBanner />
         <div className="view" hidden={view !== 'convert'}>
           <ConvertView active={view === 'convert'} incoming={incoming} />
         </div>

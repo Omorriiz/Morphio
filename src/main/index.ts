@@ -2,7 +2,7 @@ import { appendFileSync, writeSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen, shell } from 'electron'
 import { INPUT_IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from '@shared/types'
 import type {
   AppSettings,
@@ -64,7 +64,10 @@ import type { ChainConfig } from '@shared/chains'
 import { JobQueue } from './queue'
 import { describeItem, getTargets, kindOfExt, MERGE_TARGET, runMerge, runUniversal, targetsForKind } from './registry'
 import { cancelArchives } from './converters/archives'
-import { flushSettings, getSettings, loadSettings, patchSettings, settingsState } from './settings'
+import { flushSettings, getSettings, loadSettings, patchSettings, resetSettings, settingsState } from './settings'
+import { initLogger, installCrashHandlers, logError, openLogsFolder, reportProblem } from './logger'
+import { setJobErrorHook } from './queue'
+import { checkUpdates, dismissUpdate, downloadUpdate, initUpdater, installUpdate, scheduleUpdateChecks, updateState } from './updater'
 import { tm } from './tm'
 import {
   applySettings,
@@ -73,6 +76,7 @@ import {
   hasTray,
   initBackground,
   isQuitting,
+  markQuitting,
   maybeQuitIdle,
   openInMain,
   parseArgs,
@@ -103,10 +107,27 @@ function overlayFor(dark: boolean): Electron.TitleBarOverlayOptions {
   return { color: '#00000000', symbolColor: dark ? '#e8e8f0' : '#3a3a4a', height: 44 }
 }
 
+/** Сохранённое положение окна, если оно ещё попадает на какой-нибудь экран. */
+function savedBounds(): { width: number; height: number; x?: number; y?: number; maximized: boolean } {
+  const w = getSettings().window
+  if (!w) return { width: 1040, height: 700, maximized: false }
+  const visible =
+    w.x === undefined ||
+    w.y === undefined ||
+    screen.getAllDisplays().some((d) => {
+      const b = d.workArea
+      return w.x! + 100 < b.x + b.width && w.x! + w.width - 100 > b.x && w.y! >= b.y - 10 && w.y! + 100 < b.y + b.height
+    })
+  return { width: w.width, height: w.height, x: visible ? w.x : undefined, y: visible ? w.y : undefined, maximized: w.maximized }
+}
+
 function createWindow(show = true): BrowserWindow {
+  const saved = savedBounds()
   const win = new BrowserWindow({
-    width: 1040,
-    height: 700,
+    width: saved.width,
+    height: saved.height,
+    x: saved.x,
+    y: saved.y,
     minWidth: 820,
     minHeight: 560,
     show: false,
@@ -123,10 +144,17 @@ function createWindow(show = true): BrowserWindow {
   })
 
   mainWindow = win
+  if (saved.maximized) win.maximize()
   if (show) win.once('ready-to-show', () => win.show())
 
   // Закрытие окна прячет его в трей, если это включено; иначе приложение закрывается.
   win.on('close', (e) => {
+    try {
+      const b = win.getNormalBounds()
+      patchSettings({ window: { width: b.width, height: b.height, x: b.x, y: b.y, maximized: win.isMaximized() } })
+    } catch {
+      /* положение окна не критично */
+    }
     if (!isQuitting() && hasTray() && getSettings().closeToTray) {
       e.preventDefault()
       win.hide()
@@ -192,6 +220,28 @@ function registerIpc(): void {
     await applySettings()
     return settingsState(backgroundState())
   })
+  ipcMain.handle('settings:reset', async () => {
+    resetSettings()
+    await applySettings()
+    return settingsState(backgroundState())
+  })
+  ipcMain.handle('updates:state', () => updateState())
+  ipcMain.handle('updates:check', async () => {
+    await checkUpdates()
+  })
+  ipcMain.handle('updates:download', () => downloadUpdate())
+  ipcMain.handle('updates:install', () => {
+    installUpdate()
+  })
+  ipcMain.handle('updates:dismiss', () => dismissUpdate())
+  ipcMain.handle('app:open-data', async () => {
+    await shell.openPath(app.getPath('userData'))
+  })
+  ipcMain.handle('log:open-folder', () => openLogsFolder())
+  ipcMain.handle('log:renderer-error', (_e, message: string, stack?: string) => {
+    logError('window', `${String(message).slice(0, 2000)}${stack ? '\n' + String(stack).slice(0, 4000) : ''}`)
+  })
+  ipcMain.handle('log:report', (_e, note?: string) => reportProblem(typeof note === 'string' ? note.slice(0, 3000) : undefined))
   ipcMain.handle('watch:status', () => watchStatus())
   ipcMain.handle('any:targets-for-kind', (_e, kind: FileKind) => targetsForKind(kind))
 
@@ -591,10 +641,19 @@ if (CLI_MODE) {
   })
 }
 
+installCrashHandlers()
+
 app.whenReady().then(async () => {
   if (CLI_MODE) return runCliMode()
   void cleanupFrameDirs() // остатки кадров от прошлого запуска
   await loadSettings()
+  initLogger()
+  setJobErrorHook((name, e) => logError(`convert: ${name}`, e))
+  initUpdater(
+    (s) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('updates:state-changed', s)),
+    () => markQuitting()
+  )
+  scheduleUpdateChecks()
   // Модули (Pandoc): ставятся в папку данных; рядом с портативным exe и в корне проекта (разработка) тоже ищем
   configureModules([
     join(app.getPath('userData'), 'modules'),

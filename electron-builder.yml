@@ -41,9 +41,33 @@ asarUnpack:
   - node_modules/regenerator-runtime/**/*
   - node_modules/wasm-feature-detect/**/*
   - node_modules/zlibjs/**/*
+extraFiles:
+  # командная строка: morphio.cmd лежит рядом с Morphio.exe
+  - from: morphio.cmd
+    to: morphio.cmd
 win:
   icon: build/icon.ico
   target:
+    - target: nsis
+      arch: [x64]
     - target: portable
       arch: [x64]
-  artifactName: Morphio.${ext}
+nsis:
+  license: LICENSE
+  artifactName: Morphio-Setup-${version}.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Morphio
+  language: '1049'
+  deleteAppDataOnUninstall: false
+  include: build/installer.nsh
+portable:
+  artifactName: Morphio-Portable-${version}.${ext}
+publish:
+  provider: github
+  owner: Omorriiz
+  repo: Morphio
+  releaseType: draft

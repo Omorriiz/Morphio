@@ -7,3 +7,5 @@ Morphio.exe
 *.log
 modules/
 models-release/
+test-results/
+*.tsbuildinfo
